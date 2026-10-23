@@ -106,3 +106,19 @@ test('desktop file launch imports binary image data once and updates the window 
   await expect(page.locator('.dimension-pair > div').last()).toContainText('41');
   await expect.poll(()=>page.evaluate(()=>Reflect.get(window,'paintLaunchCheck'))).toEqual({reads:1,title:'Launch image — OpenAEC Paint Studio'});
 });
+
+test('Escape cancels drawing and inline text and returns to selection', async ({page}) => {
+  await page.goto('/');
+  await expect(page.getByText('Concept opgeslagen op dit apparaat',{exact:true})).toBeVisible();
+  const surface=page.getByLabel('Drawing surface',{exact:true});
+  const box=(await surface.boundingBox())!;
+  await page.mouse.move(box.x+25,box.y+25);await page.mouse.down();await page.mouse.move(box.x+90,box.y+70);
+  await page.keyboard.press('Escape');await page.mouse.up();
+  const selection=page.getByRole('button',{name:'Objecten selecteren',exact:true});
+  await expect(selection).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('.history-item')).toHaveCount(0);
+  await page.getByRole('button',{name:'Tekst',exact:true}).click();await surface.click({position:{x:60,y:60}});
+  const text=page.getByLabel('Tekstinhoud',{exact:true});await text.fill('Annuleren');await text.press('Escape');
+  await expect(text).not.toBeVisible();await expect(selection).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('.history-item')).toHaveCount(0);
+});

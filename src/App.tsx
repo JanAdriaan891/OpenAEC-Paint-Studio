@@ -146,6 +146,15 @@ export default function App() {
   useEffect(()=>{setSelection(index=>index!==null&&index>=doc.operations.length?null:index);},[doc.operations.length]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.isComposing) {
+        e.preventDefault();
+        gesture.current = null; objectDrag.current = null;
+        preview.current?.getContext('2d')?.clearRect(0, 0, doc.width, doc.height);
+        setTextBox(null); setTransient(null); setFileOpen(false); setModal('');
+        setTool('select');
+        if ((e.target as HTMLElement).matches('input, textarea, select')) (e.target as HTMLElement).blur();
+        return;
+      }
       if ((e.target as HTMLElement).closest('input, textarea, select, dialog') || modal || busy) return;
       if(e.key==='Delete' && selection!==null && tool==='select'){e.preventDefault();commit({...doc,operations:doc.operations.filter((_,i)=>i!==selection)});setSelection(null);return;}
       if(e.key==='F11'){e.preventDefault();setFocus(value=>!value);return;}
@@ -161,7 +170,6 @@ export default function App() {
         if (selected) {setTool(selected.id);if(selected.id==='text'&&size<24)setSize(32);}
         if (e.key === '[') setSize(s => Math.max(1, s - 1));
         if (e.key === ']') setSize(s => Math.min(200, s + 1));
-        if (e.key === 'Escape') { gesture.current = null; preview.current?.getContext('2d')?.clearRect(0, 0, doc.width, doc.height); setFileOpen(false); setTextBox(null); setTransient(null); objectDrag.current=null; }
       }
     };
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
