@@ -226,3 +226,34 @@ test('holding the middle mouse button pans without drawing and releases outside 
   await page.mouse.down(); await page.mouse.move(x + 50, y + 50, {steps:3}); await page.mouse.up();
   await expect(page.locator('.history-item')).toHaveCount(1);
 });
+
+test('Ctrl+A selects all objects without selecting page text and preserves text editing', async ({page}) => {
+  await page.goto('/');
+  await expect(page.getByText('Concept opgeslagen op dit apparaat', {exact:true})).toBeVisible();
+  const surface=page.getByLabel('Drawing surface',{exact:true});
+  await page.getByRole('button',{name:'Rechthoek',exact:true}).click();
+  const box=(await surface.boundingBox())!;
+  for(const offset of [35,150]) {
+    await page.mouse.move(box.x+offset,box.y+40);await page.mouse.down();
+    await page.mouse.move(box.x+offset+50,box.y+90,{steps:3});await page.mouse.up();
+  }
+  await expect(page.locator('.history-item')).toHaveCount(2);
+  await page.keyboard.press('Control+a');
+  await expect(surface).toHaveClass(/tool-select/);
+  await expect(page.locator('.selection-outline')).toBeVisible();
+  expect(await page.evaluate(()=>window.getSelection()?.toString())).toBe('');
+  const outline=(await page.locator('.selection-outline').boundingBox())!;
+  expect(outline.width).toBeCloseTo(165, 0);
+  await page.mouse.move(box.x+60,box.y+60);await page.mouse.down();
+  await page.mouse.move(box.x+80,box.y+80,{steps:3});await page.mouse.up();
+  const moved=(await page.locator('.selection-outline').boundingBox())!;
+  expect(moved.x-outline.x).toBeCloseTo(20,0);
+  expect(moved.width).toBeCloseTo(outline.width,0);
+  await page.keyboard.press('Delete');await expect(page.locator('.history-item')).toHaveCount(0);
+  await page.keyboard.press('Control+z');await expect(page.locator('.history-item')).toHaveCount(2);
+  await page.getByRole('button',{name:'Tekst',exact:true}).click();
+  await surface.click({position:{x:60,y:60}});
+  const text=page.getByLabel('Tekstinhoud',{exact:true});
+  await text.fill('Een tekst');await text.press('Control+a');await text.press('Backspace');
+  await expect(text).toHaveValue('');
+});

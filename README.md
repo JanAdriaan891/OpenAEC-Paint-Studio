@@ -12,7 +12,8 @@ A small image editor inspired by MS Paint, using the OpenAEC application style. 
 - Open PNG, JPEG, WebP, GIF, BMP, TIFF, HEIC/HEIF, AVIF, PSD, SVG, ICO, TGA, JPEG 2000, JPEG XL and supported camera RAW variants, plus IFCX/IFCXB raster documents.
 - Native browser decoders handle common images; a bundled ImageMagick WebAssembly worker handles additional formats locally. See [format support and limits](docs/IMAGE-FORMATS.md).
 - Export PNG, JPEG, WebP or SVG; save the raster image embedded in IFCX or IFCXB.
-- Undo/redo (40 recent document states), zoom, pixel grid and local draft recovery using IndexedDB.
+- Undo/redo (40 recent document states), Ctrl+wheel zoom, middle-button drag to pan, pixel grid and local draft recovery using IndexedDB.
+- Ctrl+A selects all objects together for moving, resizing or deleting; text fields retain normal text selection.
 - Dutch and English; light, Forge, OpenAEC, Blueprint and high contrast themes. Fonts are bundled for offline use.
 
 ## Run

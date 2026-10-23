@@ -4,7 +4,7 @@
 
 `pnpm build` checks TypeScript, builds the frontend and emits the standalone service JavaScript. `pnpm tauri build --bundles deb,appimage` produces Linux installers. Windows NSIS and macOS DMG builds run on their respective platforms using `.github/workflows/build.yml`.
 
-CI runs tests before the native build matrix. It uploads artifacts to the workflow run; it does not publish a release or create a GitHub repository. Release `2026.43` uses Git tag `2026.43` and package version `2026.43.0`.
+CI runs tests before the native build matrix. It uploads artifacts to the workflow run; it does not publish a release or create a GitHub repository. Release `2026.43` uses Git tag `2026.43` and package version `2026.43.0`. Patch release `2026.43.1` adds canvas navigation and select-all shortcuts; its tag and package version are both `2026.43.1`.
 
 ## Detached release signing
 

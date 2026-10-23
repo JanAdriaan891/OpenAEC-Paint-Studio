@@ -11,7 +11,7 @@ import { documentSchema, newDocument, drawOperation, type PaintDocument, type Op
 import { renderDocument } from './render';
 import { draftStore, saveFile, isDesktop } from './storage';
 import { labels, type Label } from './labels';
-import { compose, operationBounds, transformedOperation, type Matrix, type Bounds } from '../shared/geometry';
+import { operationBounds, transformedOperation, type Matrix, type Bounds } from '../shared/geometry';
 import { documentSvg } from '../shared/svg';
 import { adjustPixels, type Adjustments } from '../shared/adjustments';
 import { decodeFile, bytesToDataUrl, supportedFormats, imageFileAccept } from './images';
@@ -42,10 +42,10 @@ export default function App() {
   const [text, setText] = useState('OpenAEC'), [newWidth, setNewWidth] = useState(1200), [newHeight, setNewHeight] = useState(800), [newName, setNewName] = useState('Untitled'), [newBackground, setNewBackground] = useState('#ffffff');
   const [token, setToken] = useState(''), [remote, setRemote] = useState<{ id: string; revision: number } | null>(null), [remoteId, setRemoteId] = useState(''), [remoteList, setRemoteList] = useState<{ id: string; name: string; revision: number }[]>([]), [apiBusy, setApiBusy] = useState(false);
   const [busy,setBusy]=useState(false),[focus,setFocus]=useState(false),[inspectorOpen,setInspectorOpen]=useState(true);
-  const [selection,setSelection]=useState<number|null>(null),[transient,setTransient]=useState<PaintDocument|null>(null);
+  const [selection,setSelection]=useState<number|'all'|null>(null),[transient,setTransient]=useState<PaintDocument|null>(null);
   const [textBox,setTextBox]=useState<{at:Point;index?:number}|null>(null),[textFont,setTextFont]=useState<'sans-serif'|'serif'|'monospace'>('sans-serif'),[textBold,setTextBold]=useState(false);
   const [corrections,setCorrections]=useState<Adjustments>({brightness:0,contrast:0,saturation:100}),[formats,setFormats]=useState<{format:string;description:string}[]>([]);
-  const objectDrag=useRef<{index:number;at:Point;operation:Operation;bounds:Bounds;resize:boolean;next:Operation}|null>(null);
+  const objectDrag=useRef<{indices:number[];at:Point;operations:Operation[];bounds:Bounds;resize:boolean;next:Operation[]}|null>(null);
   const canvas = useRef<HTMLCanvasElement>(null), preview = useRef<HTMLCanvasElement>(null), workspace = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null), projectInput = useRef<HTMLInputElement>(null);
   const gesture = useRef<Operation | null>(null), ready = useRef(false);
 
@@ -202,7 +202,7 @@ export default function App() {
       element.removeEventListener('auxclick', auxClick);
     };
   }, []);
-  useEffect(()=>{setSelection(index=>index!==null&&index>=doc.operations.length?null:index);},[doc.operations.length]);
+  useEffect(()=>{setSelection(index=>typeof index==='number'&&index>=doc.operations.length?null:index);},[doc.operations.length]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !e.isComposing) {
@@ -215,11 +215,17 @@ export default function App() {
         return;
       }
       if ((e.target as HTMLElement).closest('input, textarea, select, dialog') || modal || busy) return;
-      if(e.key==='Delete' && selection!==null && tool==='select'){e.preventDefault();commit({...doc,operations:doc.operations.filter((_,i)=>i!==selection)});setSelection(null);return;}
+      if(e.key==='Delete' && selection!==null && tool==='select'){e.preventDefault();commit({...doc,operations:selection==='all'?[]:doc.operations.filter((_,i)=>i!==selection)});setSelection(null);return;}
       if(e.key==='F11'){e.preventDefault();setFocus(value=>!value);return;}
       if (e.ctrlKey || e.metaKey) {
         const key = e.key.toLowerCase();
-        if (['s', 'o', 'z', 'y'].includes(key)) e.preventDefault();
+        if (['a', 's', 'o', 'z', 'y'].includes(key)) e.preventDefault();
+        if (key === 'a') {
+          window.getSelection()?.removeAllRanges();
+          gesture.current = null; objectDrag.current = null; setTransient(null);
+          preview.current?.getContext('2d')?.clearRect(0, 0, doc.width, doc.height);
+          setTool('select'); setSelection('all');
+        }
         if (key === 's') void save();
         if (key === 'o') input.current?.click();
         if (key === 'z') e.shiftKey ? redo() : undo();
@@ -250,12 +256,17 @@ export default function App() {
     const at = location(e); setPosition(at); e.currentTarget.setPointerCapture(e.pointerId);
     const style = { color, size, opacity: opacity / 100 };
     if(tool==='select') {
-      const selected=selection!==null?doc.operations[selection]:null;
-      const selectedBounds=selected?boundsFor(selected):null;
+      const selectedBounds=selection==='all'?allBounds(doc):typeof selection==='number'?boundsFor(doc.operations[selection]):null;
       const nearCorner=selectedBounds&&Math.hypot(at.x-selectedBounds.x-selectedBounds.width,at.y-selectedBounds.y-selectedBounds.height)<12*100/zoom;
-      const index=nearCorner?selection!:[...doc.operations.keys()].reverse().find(i=>{const b=boundsFor(doc.operations[i]);return b&&at.x>=b.x-5&&at.x<=b.x+b.width+5&&at.y>=b.y-5&&at.y<=b.y+b.height+5;});
+      const inGroup=selection==='all'&&selectedBounds&&at.x>=selectedBounds.x&&at.x<=selectedBounds.x+selectedBounds.width&&at.y>=selectedBounds.y&&at.y<=selectedBounds.y+selectedBounds.height;
+      if(selection==='all'&&(inGroup||nearCorner)){
+        const operations=doc.operations;
+        objectDrag.current={indices:operations.map((_,i)=>i),at,operations,bounds:selectedBounds!,resize:!!nearCorner,next:operations};
+        return;
+      }
+      const index=nearCorner&&typeof selection==='number'?selection:[...doc.operations.keys()].reverse().find(i=>{const b=boundsFor(doc.operations[i]);return b&&at.x>=b.x-5&&at.x<=b.x+b.width+5&&at.y>=b.y-5&&at.y<=b.y+b.height+5;});
       setSelection(index??null);
-      if(index!==undefined){const operation=doc.operations[index],bounds=boundsFor(operation)!;objectDrag.current={index,at,operation,bounds,resize:!!nearCorner,next:operation};if('color' in operation)setColor(operation.color);if('size' in operation){setSize(operation.size);setOpacity(operation.opacity*100);}if('filled' in operation)setFilled(operation.filled);if(operation.type==='text'){setTextFont(operation.fontFamily||'sans-serif');setTextBold(!!operation.bold);}}
+      if(index!==undefined){const operation=doc.operations[index],bounds=boundsFor(operation)!;objectDrag.current={indices:[index],at,operations:[operation],bounds,resize:!!nearCorner,next:[operation]};if('color' in operation)setColor(operation.color);if('size' in operation){setSize(operation.size);setOpacity(operation.opacity*100);}if('filled' in operation)setFilled(operation.filled);if(operation.type==='text'){setTextFont(operation.fontFamily||'sans-serif');setTextBold(!!operation.bold);}}
       return;
     }
     if (tool === 'picker') {
@@ -281,8 +292,8 @@ export default function App() {
       const dx=at.x-drag.at.x,dy=at.y-drag.at.y,b=drag.bounds;
       let matrix:Matrix=[1,0,0,1,dx,dy];
       if(drag.resize){let sx=Math.max(.05,(b.width+dx)/b.width),sy=Math.max(.05,(b.height+dy)/b.height);if(e.shiftKey)sx=sy=Math.max(sx,sy);matrix=[sx,0,0,sy,b.x*(1-sx),b.y*(1-sy)];}
-      drag.next={...drag.operation,transform:compose(matrix,drag.operation.transform)};
-      setTransient({...doc,operations:doc.operations.map((op,i)=>i===drag.index?drag.next:op)});return;
+      drag.next=drag.operations.map(op=>transformedOperation(op,matrix,doc));
+      setTransient({...doc,operations:doc.operations.map((op,i)=>{const index=drag.indices.indexOf(i);return index<0?op:drag.next[index];})});return;
     }
     const op = gesture.current; if (!op) return;
     if (op.type === 'brush' || op.type === 'eraser') { if (op.points.length < 20000) op.points.push(at); }
@@ -296,13 +307,19 @@ export default function App() {
     previewGesture();
   }
   function pointerUp(e: PointerEvent<HTMLCanvasElement>) {
-    if(objectDrag.current){const drag=objectDrag.current;objectDrag.current=null;setTransient(null);if(drag.next!==drag.operation)commit({...doc,operations:doc.operations.map((op,i)=>i===drag.index?drag.next:op)});}
+    if(objectDrag.current){const drag=objectDrag.current;objectDrag.current=null;setTransient(null);if(drag.next.some((op,i)=>op!==drag.operations[i]))commit({...doc,operations:doc.operations.map((op,i)=>{const index=drag.indices.indexOf(i);return index<0?op:drag.next[index];})});}
     const op = gesture.current; gesture.current = null;
     preview.current?.getContext('2d')?.clearRect(0, 0, doc.width, doc.height);
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
     if (op) { try { if (tool === 'crop' && 'from' in op) void transform('crop', op.from, op.to); else add(op); } catch (error) { fail(error); } }
   }
   function boundsFor(op:Operation){return operationBounds(op.type==='image'?{...op,sourceSize:op.sourceSize||{width:doc.width,height:doc.height}}:op);}
+  function allBounds(document:PaintDocument):Bounds {
+    const bounds=document.operations.map(boundsFor).filter((value):value is Bounds=>value!==null);
+    if(!bounds.length)return {x:0,y:0,width:document.width,height:document.height};
+    const x=Math.min(...bounds.map(b=>b.x)),y=Math.min(...bounds.map(b=>b.y));
+    return {x,y,width:Math.max(...bounds.map(b=>b.x+b.width))-x,height:Math.max(...bounds.map(b=>b.y+b.height))-y};
+  }
   function applyText(){
     if(!textBox||!text.trim())return;
     const existing=textBox.index!==undefined?doc.operations[textBox.index]:null;
@@ -394,8 +411,8 @@ export default function App() {
   const chooseFile = () => { input.current?.click(); setFileOpen(false); };
   const actionNew = () => { setNewWidth(doc.width); setNewHeight(doc.height); setModal('new'); setFileOpen(false); };
   const safeZoom = (value: number) => setZoom(Math.max(10, Math.min(400, value)));
-  const selectedOperation=selection!==null?(transient??doc).operations[selection]:undefined;
-  const selectedBounds=selectedOperation&&tool==='select'?boundsFor(selectedOperation):null;
+  const selectedOperation=typeof selection==='number'?(transient??doc).operations[selection]:undefined;
+  const selectedBounds=tool==='select'?(selection==='all'?allBounds(transient??doc):selectedOperation?boundsFor(selectedOperation):null):null;
   return <div className={`studio ${focus?'focus-mode':''}`} aria-busy={busy}>
     <TitleBar name={doc.name} save={() => void save()} undo={undo} redo={redo} settings={() => setModal('settings')} canUndo={past.length > 0} canRedo={future.length > 0}/>
     <input ref={input} type="file" accept={imageFileAccept} hidden onChange={e => void openFile(e.target.files?.[0])}/>
@@ -422,7 +439,7 @@ export default function App() {
           <label htmlFor="opacity">{t('opacity')}<input id="opacity" type="range" min="1" max="100" value={opacity} disabled={['fill','picker','crop'].includes(tool)} onChange={e=>setOpacity(+e.target.value)}/><span>{opacity}%</span></label>
           {(tool==='rectangle'||tool==='ellipse')&&<label className="shape-filled"><input type="checkbox" checked={filled} onChange={e=>setFilled(e.target.checked)}/>{t('filled')}</label>}
           {tool==='text'&&<div className="text-settings"><select aria-label="Font" value={textFont} onChange={e=>setTextFont(e.target.value as typeof textFont)}><option value="sans-serif">Sans serif</option><option value="serif">Serif</option><option value="monospace">Monospace</option></select><label><input type="checkbox" checked={textBold} onChange={e=>setTextBold(e.target.checked)}/>{language==='nl'?'Vet':'Bold'}</label></div>}
-          {tool==='select'&&selection!==null&&<RibbonMenu icon={MousePointer2} label="Object">          {selectedOperation?.type==='text'&&<div className="text-settings"><select aria-label="Font" value={textFont} onChange={e=>setTextFont(e.target.value as typeof textFont)}><option value="sans-serif">Sans serif</option><option value="serif">Serif</option><option value="monospace">Monospace</option></select><label><input type="checkbox" checked={textBold} onChange={e=>setTextBold(e.target.checked)}/>{language==='nl'?'Vet':'Bold'}</label></div>}{selectedOperation&&'filled' in selectedOperation&&<label><input type="checkbox" checked={filled} onChange={e=>setFilled(e.target.checked)}/>{t('filled')}</label>}          {tool==='select'&&selection!==null&&selectedOperation&&<div className="object-actions"><button className="ribbon-small-button" disabled={!('color' in selectedOperation)} onClick={()=>{if(!('color' in selectedOperation))return;const op={...selectedOperation,color,...('size' in selectedOperation?{size,opacity:opacity/100}:{}),...(selectedOperation.type==='text'?{fontFamily:textFont,bold:textBold}:{}),...('filled' in selectedOperation?{filled}: {})};commit({...doc,operations:doc.operations.map((item,i)=>i===selection?op:item)});}}>{t('objectApply')}</button><button className="ribbon-small-button" onClick={()=>{commit({...doc,operations:doc.operations.filter((_,i)=>i!==selection)});setSelection(null);}}><Trash2 size={13}/>{t('deleteObject')}</button></div>}</RibbonMenu>}
+          {tool==='select'&&typeof selection==='number'&&<RibbonMenu icon={MousePointer2} label="Object">          {selectedOperation?.type==='text'&&<div className="text-settings"><select aria-label="Font" value={textFont} onChange={e=>setTextFont(e.target.value as typeof textFont)}><option value="sans-serif">Sans serif</option><option value="serif">Serif</option><option value="monospace">Monospace</option></select><label><input type="checkbox" checked={textBold} onChange={e=>setTextBold(e.target.checked)}/>{language==='nl'?'Vet':'Bold'}</label></div>}{selectedOperation&&'filled' in selectedOperation&&<label><input type="checkbox" checked={filled} onChange={e=>setFilled(e.target.checked)}/>{t('filled')}</label>}          {tool==='select'&&selection!==null&&selectedOperation&&<div className="object-actions"><button className="ribbon-small-button" disabled={!('color' in selectedOperation)} onClick={()=>{if(!('color' in selectedOperation))return;const op={...selectedOperation,color,...('size' in selectedOperation?{size,opacity:opacity/100}:{}),...(selectedOperation.type==='text'?{fontFamily:textFont,bold:textBold}:{}),...('filled' in selectedOperation?{filled}: {})};commit({...doc,operations:doc.operations.map((item,i)=>i===selection?op:item)});}}>{t('objectApply')}</button><button className="ribbon-small-button" onClick={()=>{commit({...doc,operations:doc.operations.filter((_,i)=>i!==selection)});setSelection(null);}}><Trash2 size={13}/>{t('deleteObject')}</button></div>}</RibbonMenu>}
         </div></RibbonGroup>
         <RibbonGroup label={t('colors')}><div className="color-control"><label className="current-color" style={{ background: color }} title={t('color')}><input type="color" aria-label={t('color')} value={color} onChange={e => setColor(e.target.value)}/></label><div className="palette">{palette.map(c => <button key={c} style={{ background: c }} className={c === color ? 'color-active' : ''} title={c} aria-label={c} onClick={() => setColor(c)}/>)}</div></div></RibbonGroup>
         <RibbonGroup label={t('image')}><div className="image-commands">
