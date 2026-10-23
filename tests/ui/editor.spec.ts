@@ -13,7 +13,7 @@ test('draw, undo/redo, export, transform and restore a local draft', async ({ pa
   await expect(page.locator('.history-item')).toHaveCount(1);
   await page.getByRole('button', { name: 'Undo', exact: true }).click(); await expect(page.locator('.history-item')).toHaveCount(0);
   await page.getByRole('button', { name: 'Redo', exact: true }).click(); await expect(page.locator('.history-item')).toHaveCount(1);
-  const downloadEvent = page.waitForEvent('download'); await page.getByRole('button', { name: 'PNG exporteren', exact: true }).click();
+  await page.locator('.home-ribbon summary').filter({hasText:'Exporteren'}).click(); const downloadEvent = page.waitForEvent('download'); await page.getByRole('button', { name: 'PNG', exact: true }).click();
   const download = await downloadEvent; expect(download.suggestedFilename()).toBe('Untitled.png'); expect(await download.failure()).toBeNull();
   await page.getByRole('button', { name: 'Afbeelding', exact: true }).click(); await page.getByRole('button', { name: '90° draaien', exact: true }).click();
   await expect(page.locator('.dimension-pair')).toContainText('800');
@@ -52,7 +52,7 @@ test('Start exposes image controls, inline text and retained SVG objects',async(
   await page.getByRole('button',{name:'Objecten selecteren',exact:true}).click();
   await surface.click({position:{x:65,y:65}});await expect(page.locator('.selection-outline')).toBeVisible();
   await page.mouse.move(box!.x+65,box!.y+65);await page.mouse.down();await page.mouse.move(box!.x+120,box!.y+110,{steps:5});await page.mouse.up();
-  const downloadEvent=page.waitForEvent('download');await page.getByRole('button',{name:'SVG',exact:true}).click();
+  await page.locator('.home-ribbon summary').filter({hasText:'Exporteren'}).click();const downloadEvent=page.waitForEvent('download');await page.getByRole('button',{name:'SVG',exact:true}).click();
   const downloaded=await downloadEvent;const path=await downloaded.path();expect(path).not.toBeNull();const svg=readFileSync(path!,'utf8');expect(svg).toContain('<text');expect(svg).toContain('Editable vector');expect(svg).not.toContain('<image');
   await page.getByRole('button',{name:'Focusmodus',exact:true}).first().click();await expect(page.locator('.paint-ribbon')).not.toBeVisible();await page.getByRole('button',{name:'Focusmodus',exact:true}).first().click();await expect(page.locator('.paint-ribbon')).toBeVisible();
 });
