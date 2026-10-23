@@ -73,7 +73,11 @@ test('SVG import uses the browser renderer',async({page})=>{
 test('cropping retains a fill when its original seed lies outside the crop',async({page})=>{
   await page.goto('/');await expect(page.getByText('Concept opgeslagen op dit apparaat',{exact:true})).toBeVisible();
   const doc={...newDocument(64,64),operations:[{type:'fill',at:{x:5,y:5},color:'#d97706'}]};
-  await page.locator('input[accept=".oapaint"]').setInputFiles({name:'filled.oapaint',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(doc))});
+  await page.evaluate(async value=>{
+    const db=await new Promise<IDBDatabase>((resolve,reject)=>{const request=indexedDB.open('openaec-paint',1);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+    await new Promise<void>((resolve,reject)=>{const tx=db.transaction('drafts','readwrite');tx.objectStore('drafts').put(value,'current');tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});db.close();
+  },doc);
+  await page.reload();
   await expect(page.locator('.dimension-pair > div').first()).toContainText('64');
   await page.getByRole('button',{name:'Bijsnijden',exact:true}).click();
   const surface=page.getByLabel('Drawing surface',{exact:true}),box=await surface.boundingBox();expect(box).not.toBeNull();
@@ -101,7 +105,7 @@ test('desktop file launch imports binary image data once and updates the window 
     });
   },Array.from(image.toBuffer('image/png')));
   await page.goto('/');
-  await expect(page.locator('.document-tab')).toContainText('Launch image.oapaint');
+  await expect(page.locator('.document-tab')).toContainText('Launch image.ifcx');
   await expect(page.locator('.dimension-pair > div').first()).toContainText('73');
   await expect(page.locator('.dimension-pair > div').last()).toContainText('41');
   await expect.poll(()=>page.evaluate(()=>Reflect.get(window,'paintLaunchCheck'))).toEqual({reads:1,title:'Launch image — OpenAEC Paint Studio'});
@@ -133,7 +137,38 @@ test('Open filters image files and offers a separate project picker', async ({pa
   expect(accepted).not.toContain('.oapaint');expect(accepted).not.toContain('.pdf');await picker.setFiles([]);
   await page.getByRole('button',{name:'Bestand',exact:true}).click();
   const projectEvent=page.waitForEvent('filechooser');
-  await page.getByRole('button',{name:'Project openen',exact:true}).click();
+  await page.getByRole('button',{name:'IFCX openen',exact:true}).click();
   const projectPicker=await projectEvent;
-  expect(await projectPicker.element().getAttribute('accept')).toBe('.oapaint');await projectPicker.setFiles([]);
+  expect(await projectPicker.element().getAttribute('accept')).toBe('.ifcx,.ifcxb');await projectPicker.setFiles([]);
+});
+
+test('IFCX raster exports include the image and reopen as a raster',async({page})=>{
+  await page.goto('/');await expect(page.getByText('Concept opgeslagen op dit apparaat',{exact:true})).toBeVisible();
+  const surface=page.getByLabel('Drawing surface',{exact:true});
+  await surface.click({position:{x:60,y:60}});
+  await expect(page.locator('.history-item')).toHaveCount(1);
+  let binaryPath='';
+  for(const format of ['IFCX','IFCXB']){
+    await page.locator('.home-ribbon summary').filter({hasText:'Exporteren'}).click();
+    const event=page.waitForEvent('download');await page.getByRole('button',{name:`${format} (raster)`,exact:true}).click();
+    const file=await event;expect(file.suggestedFilename()).toBe(`Untitled.${format.toLowerCase()}`);
+    const path=(await file.path())!;
+    const {readRasterIfcx}=await import('../../shared/ifcx');
+    const image=await readRasterIfcx(new Uint8Array(readFileSync(path)));
+    expect(image.width).toBe(1200);expect(image.height).toBe(800);expect(image.uri).toMatch(/^data:image\/png;base64,/);
+    if(format==='IFCXB')binaryPath=path;
+    await expect(page.locator('.history-item')).toHaveCount(1);
+  }
+  page.on('dialog',dialog=>void dialog.accept());
+  await page.locator('input[accept^=".ifcx"]').setInputFiles({name:'raster.ifcxb',mimeType:'application/octet-stream',buffer:readFileSync(binaryPath)});
+  await expect(page.locator('.history-item')).toContainText('Afbeelding');
+});
+
+test('Save uses IFCX with an embedded PNG',async({page})=>{
+  await page.goto('/');await expect(page.getByText('Concept opgeslagen op dit apparaat',{exact:true})).toBeVisible();
+  const event=page.waitForEvent('download');await page.getByRole('button',{name:'Save',exact:true}).click();
+  const file=await event;expect(file.suggestedFilename()).toBe('Untitled.ifcx');
+  const {readRasterIfcx}=await import('../../shared/ifcx');
+  const image=await readRasterIfcx(new Uint8Array(readFileSync((await file.path())!)));
+  expect(image.width).toBe(1200);expect(image.height).toBe(800);
 });

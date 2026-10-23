@@ -36,7 +36,20 @@ const applications = join(data, 'applications'); mkdirSync(applications, { recur
 const desktopId = 'org.openaec.paint-studio.desktop';
 const desktopQuote = value => '"' + value.replace(/[\\"`$]/g, '\\$&') + '"';
 writeFileSync(join(applications, desktopId), `[Desktop Entry]\nType=Application\nName=OpenAEC Paint Studio\nComment=Afbeeldingen tekenen en bewerken\nExec=${/^[A-Za-z0-9/_.-]+$/.test(launcher) ? launcher : desktopQuote(launcher)} %f\nTryExec=${launcher}\nIcon=openaec-paint-studio\nTerminal=false\nCategories=Graphics;RasterGraphics;\nMimeType=${mimeTypes.join(';')};\nStartupNotify=true\nStartupWMClass=openaec-paint-studio\n`);
+// Remove only this app's obsolete project association, preserving other defaults.
+const defaultsFile = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'mimeapps.list');
+if (existsSync(defaultsFile)) {
+  const previous = JSON.parse(readFileSync(backupPath, 'utf8'))['application/x-openaec-paint'] || '';
+  const text = readFileSync(defaultsFile, 'utf8').replace(/^application\/x-openaec-paint=(.*)$/gm, (line, value) => {
+    const entries = value.split(';').filter(Boolean);
+    if (!entries.includes(desktopId)) return line;
+    const kept = entries.filter(entry => entry !== desktopId);
+    const restored = kept.length ? kept.join(';') : previous;
+    return restored ? `application/x-openaec-paint=${restored}` : '';
+  });
+  writeFileSync(defaultsFile, text);
+}
 run('update-mime-database', [join(data, 'mime')]);
 run('update-desktop-database', [applications]);
-for (const type of mimeTypes) run('xdg-mime', ['default', desktopId, type]);
-console.log(`Installed: ${launcher}\nDesktop entry: ${join(applications, desktopId)}\nAssociated ${mimeTypes.length} image/project MIME types. Previous defaults: ${backupPath}`);
+for (const type of mimeTypes.filter(type => type.startsWith('image/'))) run('xdg-mime', ['default', desktopId, type]);
+console.log(`Installed: ${launcher}\nDesktop entry: ${join(applications, desktopId)}\nAssociated ${mimeTypes.length} image/IFCX MIME types (image defaults updated). Previous defaults: ${backupPath}`);

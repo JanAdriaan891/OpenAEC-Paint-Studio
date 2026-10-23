@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, type PointerEvent, type Compo
 import { Paintbrush, Eraser, PaintBucket, Pipette, Minus, Square, Circle, Type, FilePlus2, FolderOpen, Download, Save, Grid2X2, Scan, ZoomIn, ZoomOut, Trash2, Plug, Upload, ArrowDownToLine, ChevronRight, Check, Image as ImageIcon, Clock3, Crop, RotateCw, FlipHorizontal2, Scaling, RotateCcw, FlipVertical2, MousePointer2, SlidersHorizontal, Contrast, Blend, PanelRight, Maximize2, CheckCheck } from 'lucide-react';
 import TitleBar from './components/TitleBar';
 import { releaseVersion } from './version';
+import { rasterIfcx, encodeRasterIfcx, readRasterIfcx } from '../shared/ifcx';
 import Dialog from './components/Dialog';
 import RibbonGroup from './components/ribbon/RibbonGroup';
 import RibbonTab from './components/ribbon/RibbonTab';
@@ -126,8 +127,9 @@ export default function App() {
 
   const save = useCallback(async () => {
     try {
-      const blob = new Blob([JSON.stringify(doc)], { type: 'application/json' });
-      if (await saveFile(`${doc.name}.oapaint`, blob, 'oapaint')) notify(t('projectSaved'));
+      const image = await renderDocument(doc);
+      const blob = await encodeRasterIfcx(rasterIfcx(doc.name,doc.width,doc.height,image.toDataURL('image/png')));
+      if (await saveFile(`${doc.name}.ifcx`, blob, 'ifcx')) notify(t('projectSaved'));
     } catch (error) { fail(error); }
   }, [doc, fail, notify, t]);
   const exportPng = useCallback(async () => {
@@ -270,10 +272,13 @@ export default function App() {
   async function filterImage(kind:'adjust'|'grayscale'|'invert'|'sepia'){
     setBusy(true);try{const image=await renderDocument(doc),ctx=image.getContext('2d')!,pixels=ctx.getImageData(0,0,doc.width,doc.height);adjustPixels(pixels.data,kind==='adjust'?corrections:{brightness:0,contrast:0,saturation:100},kind);ctx.putImageData(pixels,0,0);commit({...doc,operations:[{type:'image',data:image.toDataURL('image/png'),sourceSize:{width:doc.width,height:doc.height}}]});setSelection(null);setModal('');}catch(error){fail(error);}finally{setBusy(false);}
   }
-  async function exportOther(format:'svg'|'jpeg'|'webp'){
+  async function exportOther(format:'svg'|'jpeg'|'webp'|'ifcx'|'ifcxb'){
     try{
       let blob:Blob;
-      if(format==='svg'){
+      if(format==='ifcx'||format==='ifcxb'){
+        const image=await renderDocument(doc);
+        blob=await encodeRasterIfcx(rasterIfcx(doc.name,doc.width,doc.height,image.toDataURL('image/png')),format==='ifcxb');
+      }else if(format==='svg'){
         let output=doc;const lastFill=doc.operations.findLastIndex(op=>op.type==='fill');
         if(lastFill>=0){const prefix=await renderDocument({...doc,background:'transparent',operations:doc.operations.slice(0,lastFill+1)});output={...doc,operations:[{type:'image',data:prefix.toDataURL('image/png'),sourceSize:{width:doc.width,height:doc.height}},...doc.operations.slice(lastFill+1)]};}
         blob=new Blob([documentSvg(output)],{type:'image/svg+xml'});
@@ -291,9 +296,12 @@ export default function App() {
     setBusy(true);
     try {
       if (file.size > 64_000_000) throw new Error('File exceeds 64 MB');
+      if(/\.ifcxb?$/i.test(file.name)){
+        const image=await readRasterIfcx(new Uint8Array(await file.arrayBuffer()));
+        file=new File([image.bytes as BlobPart],`${image.name}.png`,{type:'image/png'});
+      }
       let next: PaintDocument;
-      if (file.name.toLowerCase().endsWith('.oapaint') || file.type === 'application/json') next = documentSchema.parse(JSON.parse(await file.text()));
-      else {
+      {
         const decoded=await decodeFile(file);
         next=newDocument(decoded.width,decoded.height,file.name.replace(/\.[^.]+$/,''));
         next.background='transparent';next.retainVectors=doc.retainVectors;
@@ -334,7 +342,7 @@ export default function App() {
   return <div className={`studio ${focus?'focus-mode':''}`} aria-busy={busy}>
     <TitleBar name={doc.name} save={() => void save()} undo={undo} redo={redo} settings={() => setModal('settings')} canUndo={past.length > 0} canRedo={future.length > 0}/>
     <input ref={input} type="file" accept={imageFileAccept} hidden onChange={e => void openFile(e.target.files?.[0])}/>
-    <input ref={projectInput} type="file" accept=".oapaint" hidden onChange={e => void openFile(e.target.files?.[0])}/>
+    <input ref={projectInput} type="file" accept=".ifcx,.ifcxb" hidden onChange={e => void openFile(e.target.files?.[0])}/>
     <nav className="ribbon-tabs" aria-label="Ribbon">
       <RibbonTab label={t('file')} isFileTab onClick={() => setFileOpen(!fileOpen)}/>
       {(['home', 'image', 'view', 'automation'] as const).map(id => <RibbonTab key={id} label={t(id)} isActive={tab === id} onClick={() => { setTab(id); setFileOpen(false); }}/>) }
@@ -345,7 +353,7 @@ export default function App() {
         <RibbonGroup label={t('project')}>
           <Action icon={FolderOpen} label={t('open')} onClick={chooseFile}/>
           <RibbonMenu icon={Download} label={language==='nl'?'Exporteren':'Export'}>
-            <button onClick={()=>void exportPng()}>PNG</button><button onClick={()=>void exportOther('jpeg')}>JPEG</button><button onClick={()=>void exportOther('webp')}>WebP</button><button onClick={()=>void exportOther('svg')}>SVG</button>
+            <button onClick={()=>void exportPng()}>PNG</button><button onClick={()=>void exportOther('jpeg')}>JPEG</button><button onClick={()=>void exportOther('webp')}>WebP</button><button onClick={()=>void exportOther('svg')}>SVG</button><hr/><button onClick={()=>void exportOther('ifcx')}>IFCX (raster)</button><button onClick={()=>void exportOther('ifcxb')}>IFCXB (raster)</button>
             <hr/><button onClick={()=>void save()}><Save size={15}/>{t('save')}</button><button onClick={actionNew}><FilePlus2 size={15}/>{t('new')}</button>
           </RibbonMenu>
         </RibbonGroup>
@@ -381,8 +389,8 @@ export default function App() {
       {tab === 'view' && <><RibbonGroup label={t('zoom')}><Action icon={ZoomOut} label="−" onClick={() => safeZoom(zoom - 25)}/><Action icon={ZoomIn} label="+" onClick={() => safeZoom(zoom + 25)}/><Action icon={Scan} label={t('fit')} onClick={fit}/><Action icon={ImageIcon} label={t('actual')} onClick={() => setZoom(100)}/></RibbonGroup><RibbonGroup label={t('canvas')}><Action icon={Grid2X2} label={t('grid')} onClick={() => setGrid(!grid)} active={grid}/></RibbonGroup></>}
       {tab === 'automation' && <><RibbonGroup label="API · MCP"><Action icon={Plug} label={t('connect')} onClick={() => setModal('api')}/><Action icon={Upload} label={t('push')} onClick={() => token ? void apiAction('push') : setModal('api')} disabled={apiBusy}/><Action icon={ArrowDownToLine} label={t('pull')} onClick={() => setModal('api')}/></RibbonGroup><p className="automation-hint">REST API · 127.0.0.1:47831<br/>MCP · stdio · <code>pnpm mcp</code></p></>}
     </section>
-    {fileOpen && <div className="backstage"><header><img src="/brand/openaec-symbol-transparent.svg" alt=""/><h2>Paint Studio</h2><button onClick={() => setFileOpen(false)} aria-label="Close">×</button></header><div className="file-actions"><Action icon={FilePlus2} label={t('new')} onClick={actionNew}/><Action icon={FolderOpen} label={t('open')} onClick={chooseFile}/><Action icon={FolderOpen} label={language==='nl'?'Project openen':'Open project'} onClick={()=>{projectInput.current?.click();setFileOpen(false);}}/><Action icon={Save} label={t('save')} onClick={() => { void save(); setFileOpen(false); }}/><Action icon={Download} label={t('export')} onClick={() => { void exportPng(); setFileOpen(false); }}/><Action icon={Download} label={t('exportSvg')} onClick={()=>void exportOther('svg')}/><Action icon={Download} label="JPEG" onClick={()=>void exportOther('jpeg')}/><Action icon={Download} label="WebP" onClick={()=>void exportOther('webp')}/></div><button className="wide-button" onClick={()=>void showFormats()}>{t('formats')}</button><p>.oapaint · PNG · JPEG · TIFF · HEIC · PSD · SVG · …</p><small>{t('about')}</small></div>}
-    <div className="document-bar"><div className="document-tab"><ImageIcon size={14}/><span>{doc.name}.oapaint</span><span className="tab-dot" title={t(draftStatus)}/></div><button onClick={actionNew} title={t('new')} aria-label={t('new')}>+</button><span className="workspace-label">{t('local')}</span></div>
+    {fileOpen && <div className="backstage"><header><img src="/brand/openaec-symbol-transparent.svg" alt=""/><h2>Paint Studio</h2><button onClick={() => setFileOpen(false)} aria-label="Close">×</button></header><div className="file-actions"><Action icon={FilePlus2} label={t('new')} onClick={actionNew}/><Action icon={FolderOpen} label={t('open')} onClick={chooseFile}/><Action icon={FolderOpen} label={language==='nl'?'IFCX openen':'Open IFCX'} onClick={()=>{projectInput.current?.click();setFileOpen(false);}}/><Action icon={Save} label={t('save')} onClick={() => { void save(); setFileOpen(false); }}/><Action icon={Download} label={t('export')} onClick={() => { void exportPng(); setFileOpen(false); }}/><Action icon={Download} label={t('exportSvg')} onClick={()=>void exportOther('svg')}/><Action icon={Download} label="IFCX (raster)" onClick={()=>void exportOther('ifcx')}/><Action icon={Download} label="IFCXB (raster)" onClick={()=>void exportOther('ifcxb')}/><Action icon={Download} label="JPEG" onClick={()=>void exportOther('jpeg')}/><Action icon={Download} label="WebP" onClick={()=>void exportOther('webp')}/></div><button className="wide-button" onClick={()=>void showFormats()}>{t('formats')}</button><p>IFCX · IFCXB · PNG · JPEG · TIFF · HEIC · PSD · SVG · …</p><small>{t('about')}</small></div>}
+    <div className="document-bar"><div className="document-tab"><ImageIcon size={14}/><span>{doc.name}.ifcx</span><span className="tab-dot" title={t(draftStatus)}/></div><button onClick={actionNew} title={t('new')} aria-label={t('new')}>+</button><span className="workspace-label">{t('local')}</span></div>
     <div className="work-area">
 
       <main ref={workspace} className="canvas-workspace">

@@ -9,9 +9,9 @@ A small image editor inspired by MS Paint, using the OpenAEC application style. 
 - Crop, resize, rotate left/right and flip horizontally/vertically. The Home ribbon brings drawing tools, text/object properties, image operations, view controls and canvas settings together. Focus mode enlarges the drawing workspace.
 - Optional **Keep vector objects**: select, move, resize and restyle drawn shapes/text. Geometry transforms preserve these objects. Export editable SVG.
 - Brightness, contrast, saturation, grayscale, invert and sepia. Raster corrections flatten the image; undo restores the original objects.
-- Open PNG, JPEG, WebP, GIF, BMP, TIFF, HEIC/HEIF, AVIF, PSD, SVG, ICO, TGA, JPEG 2000, JPEG XL and supported camera RAW variants, plus `.oapaint` projects.
+- Open PNG, JPEG, WebP, GIF, BMP, TIFF, HEIC/HEIF, AVIF, PSD, SVG, ICO, TGA, JPEG 2000, JPEG XL and supported camera RAW variants, plus IFCX/IFCXB raster documents.
 - Native browser decoders handle common images; a bundled ImageMagick WebAssembly worker handles additional formats locally. See [format support and limits](docs/IMAGE-FORMATS.md).
-- Export PNG, JPEG, WebP or SVG; save an editable `.oapaint` project.
+- Export PNG, JPEG, WebP or SVG; save the raster image embedded in IFCX or IFCXB.
 - Undo/redo (40 recent document states), zoom, pixel grid and local draft recovery using IndexedDB.
 - Dutch and English; light, Forge, OpenAEC, Blueprint and high contrast themes. Fonts are bundled for offline use.
 
@@ -53,4 +53,4 @@ OpenAEC brand assets and template-derived components remain **CC BY-SA 4.0**. Se
 
 ### Linux user installation
 
-Build a DEB with `pnpm tauri build --bundles deb`, then run `node scripts/install-linux.mjs "path/to/OpenAEC Paint Studio_2026.43.0_amd64.deb"`. The installer checks system libraries, installs under `~/.local/share/openaec-paint-studio`, creates a launcher and menu entry, and associates supported image types and `.oapaint` projects for the current user. Previous MIME defaults are saved under `~/.local/state/openaec-paint-studio`. No administrator password is needed. Opening an associated file imports it into the editor; each Linux launch opens its own window.
+Build a DEB with `pnpm tauri build --bundles deb`, then run `node scripts/install-linux.mjs "path/to/OpenAEC Paint Studio_2026.43.0_amd64.deb"`. The installer checks system libraries, installs under `~/.local/share/openaec-paint-studio`, creates a launcher and menu entry, and associates supported image types; IFCX/IFCXB are offered as supported document types for the current user. Previous MIME defaults are saved under `~/.local/state/openaec-paint-studio`. No administrator password is needed. Opening an associated file imports it into the editor; each Linux launch opens its own window.

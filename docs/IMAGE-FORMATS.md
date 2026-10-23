@@ -18,11 +18,11 @@ Verified with generated fixtures: PNG, JPEG, WebP, BMP, TIFF, GIF, PSD, ICO, TGA
 
 ## Vector retention
 
-**Keep vector objects** is on by default. Shapes, brush paths and text remain separate operations in `.oapaint` projects. Choose **Select objects (V)** to move an object, drag the lower-right selection handle to resize it, or apply color/size/style from Properties. Delete removes the selected object. Choose Text and click existing text to edit its content directly on the canvas. Ctrl+Enter applies text.
+**Keep vector objects** is on by default. Shapes, brush paths and text remain separate operations while editing and in the local draft. Choose **Select objects (V)** to move an object, drag the lower-right selection handle to resize it, or apply color/size/style from Properties. Delete removes the selected object. Choose Text and click existing text to edit its content directly on the canvas. Ctrl+Enter applies text.
 
 Rotate, mirror and resize compose affine transforms with the objects, preserving geometry and text. Crop clips to the new document bounds. Turning vector retention off flattens the current image; subsequent drawing stays rasterized. Undo restores the previous document state.
 
-Brightness/contrast/saturation and other color filters flatten the complete image. Flood fill is a pixel operation: when cropping or exporting SVG, content through the last flood fill is rasterized to preserve its appearance, while later vectors remain vectors. Erasing is represented with SVG masks. Save `.oapaint` to retain the current editable scene operations. Session undo/redo snapshots are not serialized. Exporting SVG is not a substitute for saving the project.
+Brightness/contrast/saturation and other color filters flatten the complete image. Flood fill is a pixel operation: when cropping or exporting SVG, content through the last flood fill is rasterized to preserve its appearance, while later vectors remain vectors. Erasing is represented with SVG masks. Save/Ctrl+S writes a raster snapshot in IFCX. Use SVG export for vector geometry. Local drafts retain editable scene operations; session undo/redo snapshots are not serialized.
 
 ## Workspace
 

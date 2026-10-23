@@ -35,6 +35,9 @@ importers:
       '@tauri-apps/plugin-store':
         specifier: ^2.4.0
         version: 2.5.0
+      cborg:
+        specifier: 6.1.4
+        version: 6.1.4
       lucide-react:
         specifier: ^0.468.0
         version: 0.468.0(react@19.3.1)
@@ -717,6 +720,10 @@ packages:
 
   caniuse-lite@1.0.30001818:
     resolution: {integrity: sha512-XJbgo4adscw7R4MZU4/qVFkoMyPaNUAWmdNY4o/k9x7fFwmv4frIlndI9lWuaxviW9ObiZel9LuncnQPn6hQ5A==}
+
+  cborg@6.1.4:
+    resolution: {integrity: sha512-JqjDDfTuED2qUvy570NGQUXqfzC34H++AHJIZnLAmiAdHNqHJKbtzox5yViRz5rc0gM9OPSX7n7Sh+BNU263Xw==}
+    hasBin: true
 
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
@@ -1440,6 +1447,8 @@ snapshots:
       update-browserslist-db: 1.3.4(browserslist@4.29.4)
 
   caniuse-lite@1.0.30001818: {}
+
+  cborg@6.1.4: {}
 
   convert-source-map@2.0.0: {}
 

@@ -198,10 +198,18 @@
       },
       {
         "ext": [
-          "oapaint"
+          "ifcx"
         ],
-        "mimeType": "application/x-openaec-paint",
-        "name": "OpenAEC Paint project",
+        "mimeType": "application/x-ifcx",
+        "name": "IFCX document",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "ifcxb"
+        ],
+        "mimeType": "application/x-ifcxb",
+        "name": "IFCX document",
         "role": "Editor"
       }
     ]
