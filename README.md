@@ -2,6 +2,22 @@
 
 A small image editor inspired by MS Paint, using the OpenAEC application style. Runs as a browser app or a Tauri 2 desktop application.
 
+[Download installers](https://github.com/JanAdriaan891/OpenAEC-Paint-Studio/releases/latest) · [Watch the demo preview (MP4, 55 seconds)](docs/demo/OpenAEC-Paint-Studio-2026.43.1-demo-preview.mp4)
+
+## Screenshots
+
+The editor with an example floor plan, drawing tools, colors and image commands in the Home ribbon.
+
+![OpenAEC Paint Studio editor with an annotated floor plan](docs/screenshots/paint-studio-overview.png)
+
+Inline text editing while retaining editable vector objects.
+
+![Inline text editor with font and size controls](docs/screenshots/paint-studio-text-editing.png)
+
+The Forge dark theme with all objects selected using Ctrl+A.
+
+![Forge dark theme with the whole document selected](docs/screenshots/paint-studio-dark-theme.png)
+
 ## Editor
 
 - Smooth brush strokes, eraser, flood fill, eyedropper, lines, rectangles, ellipses and inline text editing.
