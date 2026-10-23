@@ -30,7 +30,7 @@ test('open an image, resize it and crop a region', async ({ page }) => {
   const sample = createCanvas(100, 80), ctx = sample.getContext('2d');
   ctx.fillStyle = '#2563eb'; ctx.fillRect(0, 0, 100, 80);
   await page.goto('/'); await expect(page.getByText('Concept opgeslagen op dit apparaat', { exact: true })).toBeVisible();
-  await page.locator('input[type=file]').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: sample.toBuffer('image/png') });
+  await page.locator('input[type=file][accept^="image/"]').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: sample.toBuffer('image/png') });
   await expect(page.locator('.dimension-pair > div').first()).toContainText('100',{timeout:25000});
   await page.getByRole('button', { name: 'Afbeelding', exact: true }).click(); await page.getByRole('button', { name: 'Formaat wijzigen', exact: true }).click();
   const dialog = page.getByRole('dialog'); await dialog.getByLabel('Breedte', { exact: true }).fill('120'); await dialog.getByLabel('Hoogte', { exact: true }).fill('100'); await dialog.getByRole('button', { name: 'Toepassen', exact: true }).click();
@@ -60,20 +60,20 @@ test('browser worker decodes a TIFF without a backend',async({page})=>{
   await initializeDecoder(readFileSync(new URL(import.meta.resolve('@imagemagick/magick-wasm/magick.wasm'))));
   const bytes=ImageMagick.read(MagickColors.Blue,80,64,image=>image.write(MagickFormat.Tiff,data=>Buffer.from(data)));
   await page.goto('/');await expect(page.getByText('Concept opgeslagen op dit apparaat',{exact:true})).toBeVisible();
-  await page.locator('input[type=file]').setInputFiles({name:'scan.tiff',mimeType:'image/tiff',buffer:bytes});
+  await page.locator('input[type=file][accept^="image/"]').setInputFiles({name:'scan.tiff',mimeType:'image/tiff',buffer:bytes});
   await expect(page.locator('.dimension-pair > div').first()).toContainText('80',{timeout:25000});await expect(page.locator('.dimension-pair > div').last()).toContainText('64');
   await expect(page.locator('.history-item')).toHaveCount(1);
 });
 test('SVG import uses the browser renderer',async({page})=>{
   await page.goto('/');await expect(page.getByText('Concept opgeslagen op dit apparaat',{exact:true})).toBeVisible();
   const svg='<svg xmlns="http://www.w3.org/2000/svg" width="96" height="64"><rect width="96" height="64" fill="#d97706"/></svg>';
-  await page.locator('input[type=file]').setInputFiles({name:'drawing.svg',mimeType:'image/svg+xml',buffer:Buffer.from(svg)});
+  await page.locator('input[type=file][accept^="image/"]').setInputFiles({name:'drawing.svg',mimeType:'image/svg+xml',buffer:Buffer.from(svg)});
   await expect(page.locator('.dimension-pair > div').first()).toContainText('96');await expect(page.locator('.dimension-pair > div').last()).toContainText('64');
 });
 test('cropping retains a fill when its original seed lies outside the crop',async({page})=>{
   await page.goto('/');await expect(page.getByText('Concept opgeslagen op dit apparaat',{exact:true})).toBeVisible();
   const doc={...newDocument(64,64),operations:[{type:'fill',at:{x:5,y:5},color:'#d97706'}]};
-  await page.locator('input[type=file]').setInputFiles({name:'filled.oapaint',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(doc))});
+  await page.locator('input[accept=".oapaint"]').setInputFiles({name:'filled.oapaint',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(doc))});
   await expect(page.locator('.dimension-pair > div').first()).toContainText('64');
   await page.getByRole('button',{name:'Bijsnijden',exact:true}).click();
   const surface=page.getByLabel('Drawing surface',{exact:true}),box=await surface.boundingBox();expect(box).not.toBeNull();
@@ -121,4 +121,19 @@ test('Escape cancels drawing and inline text and returns to selection', async ({
   const text=page.getByLabel('Tekstinhoud',{exact:true});await text.fill('Annuleren');await text.press('Escape');
   await expect(text).not.toBeVisible();await expect(selection).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('.history-item')).toHaveCount(0);
+});
+
+test('Open filters image files and offers a separate project picker', async ({page}) => {
+  await page.goto('/');
+  const event=page.waitForEvent('filechooser');
+  await page.getByRole('button',{name:'Openen',exact:true}).click();
+  const picker=await event;
+  const accepted=await picker.element().getAttribute('accept');
+  expect(accepted).toContain('image/*');expect(accepted).toContain('.psd');expect(accepted).toContain('.heic');
+  expect(accepted).not.toContain('.oapaint');expect(accepted).not.toContain('.pdf');await picker.setFiles([]);
+  await page.getByRole('button',{name:'Bestand',exact:true}).click();
+  const projectEvent=page.waitForEvent('filechooser');
+  await page.getByRole('button',{name:'Project openen',exact:true}).click();
+  const projectPicker=await projectEvent;
+  expect(await projectPicker.element().getAttribute('accept')).toBe('.oapaint');await projectPicker.setFiles([]);
 });

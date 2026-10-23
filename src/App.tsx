@@ -13,7 +13,7 @@ import { labels, type Label } from './labels';
 import { compose, operationBounds, transformedOperation, type Matrix, type Bounds } from '../shared/geometry';
 import { documentSvg } from '../shared/svg';
 import { adjustPixels, type Adjustments } from '../shared/adjustments';
-import { decodeFile, bytesToDataUrl, supportedFormats } from './images';
+import { decodeFile, bytesToDataUrl, supportedFormats, imageFileAccept } from './images';
 
 type Tool = Exclude<Operation['type'], 'image'> | 'picker' | 'crop' | 'select';
 const tools: { id: Tool; key: string; icon: ComponentType<{ size?: number }> }[] = [
@@ -45,7 +45,7 @@ export default function App() {
   const [textBox,setTextBox]=useState<{at:Point;index?:number}|null>(null),[textFont,setTextFont]=useState<'sans-serif'|'serif'|'monospace'>('sans-serif'),[textBold,setTextBold]=useState(false);
   const [corrections,setCorrections]=useState<Adjustments>({brightness:0,contrast:0,saturation:100}),[formats,setFormats]=useState<{format:string;description:string}[]>([]);
   const objectDrag=useRef<{index:number;at:Point;operation:Operation;bounds:Bounds;resize:boolean;next:Operation}|null>(null);
-  const canvas = useRef<HTMLCanvasElement>(null), preview = useRef<HTMLCanvasElement>(null), workspace = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null), preview = useRef<HTMLCanvasElement>(null), workspace = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null), projectInput = useRef<HTMLInputElement>(null);
   const gesture = useRef<Operation | null>(null), ready = useRef(false);
 
   const notify = useCallback((message: string) => setToast(message), []);
@@ -304,7 +304,7 @@ export default function App() {
       if (doc.operations.length && !window.confirm(t('replaceConfirm'))) return;
       commit(next); setRemote(null); notify(t('opened'));
     } catch (error) { fail(error); }
-    finally { setBusy(false); if (input.current) input.current.value = ''; }
+    finally { setBusy(false); if (input.current) input.current.value = ''; if (projectInput.current) projectInput.current.value = ''; }
   }
   async function api(path: string, method = 'GET', body?: unknown) {
     const response = await fetch(apiBase + path, { method, headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(15000) });
@@ -333,7 +333,8 @@ export default function App() {
   const selectedBounds=selectedOperation&&tool==='select'?boundsFor(selectedOperation):null;
   return <div className={`studio ${focus?'focus-mode':''}`} aria-busy={busy}>
     <TitleBar name={doc.name} save={() => void save()} undo={undo} redo={redo} settings={() => setModal('settings')} canUndo={past.length > 0} canRedo={future.length > 0}/>
-    <input ref={input} type="file" hidden onChange={e => void openFile(e.target.files?.[0])}/>
+    <input ref={input} type="file" accept={imageFileAccept} hidden onChange={e => void openFile(e.target.files?.[0])}/>
+    <input ref={projectInput} type="file" accept=".oapaint" hidden onChange={e => void openFile(e.target.files?.[0])}/>
     <nav className="ribbon-tabs" aria-label="Ribbon">
       <RibbonTab label={t('file')} isFileTab onClick={() => setFileOpen(!fileOpen)}/>
       {(['home', 'image', 'view', 'automation'] as const).map(id => <RibbonTab key={id} label={t(id)} isActive={tab === id} onClick={() => { setTab(id); setFileOpen(false); }}/>) }
@@ -380,7 +381,7 @@ export default function App() {
       {tab === 'view' && <><RibbonGroup label={t('zoom')}><Action icon={ZoomOut} label="−" onClick={() => safeZoom(zoom - 25)}/><Action icon={ZoomIn} label="+" onClick={() => safeZoom(zoom + 25)}/><Action icon={Scan} label={t('fit')} onClick={fit}/><Action icon={ImageIcon} label={t('actual')} onClick={() => setZoom(100)}/></RibbonGroup><RibbonGroup label={t('canvas')}><Action icon={Grid2X2} label={t('grid')} onClick={() => setGrid(!grid)} active={grid}/></RibbonGroup></>}
       {tab === 'automation' && <><RibbonGroup label="API · MCP"><Action icon={Plug} label={t('connect')} onClick={() => setModal('api')}/><Action icon={Upload} label={t('push')} onClick={() => token ? void apiAction('push') : setModal('api')} disabled={apiBusy}/><Action icon={ArrowDownToLine} label={t('pull')} onClick={() => setModal('api')}/></RibbonGroup><p className="automation-hint">REST API · 127.0.0.1:47831<br/>MCP · stdio · <code>pnpm mcp</code></p></>}
     </section>
-    {fileOpen && <div className="backstage"><header><img src="/brand/openaec-symbol-transparent.svg" alt=""/><h2>Paint Studio</h2><button onClick={() => setFileOpen(false)} aria-label="Close">×</button></header><div className="file-actions"><Action icon={FilePlus2} label={t('new')} onClick={actionNew}/><Action icon={FolderOpen} label={t('open')} onClick={chooseFile}/><Action icon={Save} label={t('save')} onClick={() => { void save(); setFileOpen(false); }}/><Action icon={Download} label={t('export')} onClick={() => { void exportPng(); setFileOpen(false); }}/><Action icon={Download} label={t('exportSvg')} onClick={()=>void exportOther('svg')}/><Action icon={Download} label="JPEG" onClick={()=>void exportOther('jpeg')}/><Action icon={Download} label="WebP" onClick={()=>void exportOther('webp')}/></div><button className="wide-button" onClick={()=>void showFormats()}>{t('formats')}</button><p>.oapaint · PNG · JPEG · TIFF · HEIC · PSD · SVG · …</p><small>{t('about')}</small></div>}
+    {fileOpen && <div className="backstage"><header><img src="/brand/openaec-symbol-transparent.svg" alt=""/><h2>Paint Studio</h2><button onClick={() => setFileOpen(false)} aria-label="Close">×</button></header><div className="file-actions"><Action icon={FilePlus2} label={t('new')} onClick={actionNew}/><Action icon={FolderOpen} label={t('open')} onClick={chooseFile}/><Action icon={FolderOpen} label={language==='nl'?'Project openen':'Open project'} onClick={()=>{projectInput.current?.click();setFileOpen(false);}}/><Action icon={Save} label={t('save')} onClick={() => { void save(); setFileOpen(false); }}/><Action icon={Download} label={t('export')} onClick={() => { void exportPng(); setFileOpen(false); }}/><Action icon={Download} label={t('exportSvg')} onClick={()=>void exportOther('svg')}/><Action icon={Download} label="JPEG" onClick={()=>void exportOther('jpeg')}/><Action icon={Download} label="WebP" onClick={()=>void exportOther('webp')}/></div><button className="wide-button" onClick={()=>void showFormats()}>{t('formats')}</button><p>.oapaint · PNG · JPEG · TIFF · HEIC · PSD · SVG · …</p><small>{t('about')}</small></div>}
     <div className="document-bar"><div className="document-tab"><ImageIcon size={14}/><span>{doc.name}.oapaint</span><span className="tab-dot" title={t(draftStatus)}/></div><button onClick={actionNew} title={t('new')} aria-label={t('new')}>+</button><span className="workspace-label">{t('local')}</span></div>
     <div className="work-area">
 

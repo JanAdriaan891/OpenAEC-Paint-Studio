@@ -1,3 +1,6 @@
+// Keep the image picker focused on images, including decoder-supported formats
+// whose MIME type is not consistently registered by every operating system.
+export const imageFileAccept = ['image/*', ...'png jpg jpeg jpe jfif gif webp bmp dib tif tiff heic heif avif psd psb svg svgz ico cur tga jp2 j2k jpx jpf jxl exr hdr pic pnm pbm pgm ppm pam qoi pcx xcf raw dng cr2 cr3 nef nrw arw srf sr2 orf raf rw2 pef srw dcr kdc mrw erf x3f 3fr iiq fits fit fts'.split(' ').map(extension => `.${extension}`)].join(',');
 export type DecodedImage = {bytes:Uint8Array;width:number;height:number;format:string;original:{width:number;height:number}};
 function workerRequest<T>(message:unknown, transfer:Transferable[]=[]):Promise<T> {
   const worker=new Worker(new URL('./image.worker.ts',import.meta.url),{type:'module'});
