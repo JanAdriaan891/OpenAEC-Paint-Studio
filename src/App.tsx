@@ -72,6 +72,35 @@ export default function App() {
     if (isDesktop()) import('@tauri-apps/api/window').then(({ getCurrentWindow }) => getCurrentWindow().show()).catch(fail);
     return () => { active = false; };
   }, [fail]);
+  const openFileHandler = useRef(openFile);
+  openFileHandler.current = openFile;
+  useEffect(() => {
+    if (!loaded || !isDesktop()) return;
+    let active = true, processing = false;
+    let unlisten: (() => void) | undefined;
+    Promise.all([import('@tauri-apps/api/core'), import('@tauri-apps/api/event')]).then(async ([{invoke}, {listen}]) => {
+      const consume = async () => {
+        if (!active || processing) return;
+        processing = true;
+        try {
+          while (active) {
+            const name = await invoke<string | null>('launch_file_name');
+            if (!name) break;
+            const bytes = await invoke<ArrayBuffer>('read_launch_file');
+            await openFileHandler.current(new File([bytes], name));
+          }
+        } catch (error) { fail(error); }
+        finally { processing = false; }
+      };
+      unlisten = await listen('paint-open-files', () => void consume());
+      if (!active) { unlisten(); return; }
+      await consume();
+    }).catch(fail);
+    return () => { active = false; unlisten?.(); };
+  }, [loaded, fail]);
+  useEffect(() => {
+    if (isDesktop()) import('@tauri-apps/api/window').then(({getCurrentWindow}) => getCurrentWindow().setTitle(`${doc.name} — OpenAEC Paint Studio`)).catch(fail);
+  }, [doc.name, fail]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme; document.documentElement.lang = language;
     localStorage.setItem('paint-theme', theme); localStorage.setItem('paint-language', language);
@@ -254,7 +283,7 @@ export default function App() {
     try {
       if (file.size > 64_000_000) throw new Error('File exceeds 64 MB');
       let next: PaintDocument;
-      if (file.name.endsWith('.oapaint') || file.type === 'application/json') next = documentSchema.parse(JSON.parse(await file.text()));
+      if (file.name.toLowerCase().endsWith('.oapaint') || file.type === 'application/json') next = documentSchema.parse(JSON.parse(await file.text()));
       else {
         const decoded=await decodeFile(file);
         next=newDocument(decoded.width,decoded.height,file.name.replace(/\.[^.]+$/,''));

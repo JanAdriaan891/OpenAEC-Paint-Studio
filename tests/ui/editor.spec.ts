@@ -81,3 +81,28 @@ test('cropping retains a fill when its original seed lies outside the crop',asyn
   await expect(page.locator('.dimension-pair > div').first()).toContainText('32');
   await expect.poll(()=>page.locator('canvas.drawing').first().evaluate(canvas=>Array.from((canvas as HTMLCanvasElement).getContext('2d')!.getImageData(1,1,1,1).data))).toEqual([217,119,6,255]);
 });
+test('desktop file launch imports binary image data once and updates the window title', async ({page}) => {
+  const image=createCanvas(73,41);image.getContext('2d').fillRect(0,0,73,41);
+  await page.addInitScript((bytes:number[])=>{
+    let pending=true;
+    const bridge={reads:0,title:''};
+    Object.assign(window,{
+      paintLaunchCheck:bridge,
+      __TAURI_EVENT_PLUGIN_INTERNALS__:{unregisterListener:()=>{}},
+      __TAURI_INTERNALS__:{
+        metadata:{currentWindow:{label:'main'}},transformCallback:()=>1,
+        invoke:async(command:string,args?:{value?:string})=>{
+          if(command==='launch_file_name')return pending?'Launch image.png':null;
+          if(command==='read_launch_file'){pending=false;bridge.reads++;return Uint8Array.from(bytes).buffer;}
+          if(command==='plugin:window|set_title')bridge.title=args?.value||'';
+          return 1;
+        },
+      },
+    });
+  },Array.from(image.toBuffer('image/png')));
+  await page.goto('/');
+  await expect(page.locator('.document-tab')).toContainText('Launch image.oapaint');
+  await expect(page.locator('.dimension-pair > div').first()).toContainText('73');
+  await expect(page.locator('.dimension-pair > div').last()).toContainText('41');
+  await expect.poll(()=>page.evaluate(()=>Reflect.get(window,'paintLaunchCheck'))).toEqual({reads:1,title:'Launch image — OpenAEC Paint Studio'});
+});

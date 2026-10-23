@@ -10,7 +10,18 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{ "label": "main", "title": "OpenAEC Paint Studio", "width": 1440, "height": 940, "minWidth": 720, "minHeight": 560, "decorations": false, "visible": false }],
+    "windows": [
+      {
+        "label": "main",
+        "title": "OpenAEC Paint Studio",
+        "width": 1440,
+        "height": 940,
+        "minWidth": 720,
+        "minHeight": 560,
+        "decorations": false,
+        "visible": false
+      }
+    ],
     "security": {
       "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:47831; object-src 'none'; base-uri 'self'"
     }
@@ -21,8 +32,178 @@
     "category": "GraphicsAndDesign",
     "shortDescription": "Drawing tools in the OpenAEC style",
     "copyright": "OpenAEC contributors. Brand assets: OpenAEC Foundation, CC BY-SA 4.0.",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
-    "linux": { "deb": { "depends": [] } },
-    "windows": { "nsis": { "installMode": "currentUser" } }
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "linux": {
+      "deb": {
+        "depends": [],
+        "files": {
+          "/usr/share/mime/packages/openaec-paint-studio.xml": "resources/openaec-paint-studio.xml"
+        }
+      }
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "fileAssociations": [
+      {
+        "ext": [
+          "png"
+        ],
+        "mimeType": "image/png",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "jpg",
+          "jpeg",
+          "jpe",
+          "jfif"
+        ],
+        "mimeType": "image/jpeg",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "webp"
+        ],
+        "mimeType": "image/webp",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "gif"
+        ],
+        "mimeType": "image/gif",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "bmp",
+          "dib"
+        ],
+        "mimeType": "image/bmp",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "tif",
+          "tiff"
+        ],
+        "mimeType": "image/tiff",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "svg",
+          "svgz"
+        ],
+        "mimeType": "image/svg+xml",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "avif"
+        ],
+        "mimeType": "image/avif",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "heic"
+        ],
+        "mimeType": "image/heic",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "heif"
+        ],
+        "mimeType": "image/heif",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "ico"
+        ],
+        "mimeType": "image/vnd.microsoft.icon",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "psd",
+          "psb"
+        ],
+        "mimeType": "image/vnd.adobe.photoshop",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "tga"
+        ],
+        "mimeType": "image/x-tga",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "jp2"
+        ],
+        "mimeType": "image/jp2",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "jxl"
+        ],
+        "mimeType": "image/jxl",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "exr"
+        ],
+        "mimeType": "image/x-exr",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "dng"
+        ],
+        "mimeType": "image/x-adobe-dng",
+        "name": "Image",
+        "role": "Editor"
+      },
+      {
+        "ext": [
+          "oapaint"
+        ],
+        "mimeType": "application/x-openaec-paint",
+        "name": "OpenAEC Paint project",
+        "role": "Editor"
+      }
+    ]
   }
 }

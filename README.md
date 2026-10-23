@@ -50,3 +50,7 @@ See [API](docs/API.md), [MCP](docs/MCP.md), and [builds and signing](docs/RELEAS
 Adapted from [OpenAEC-Foundation/OpenAEC-style-book](https://github.com/OpenAEC-Foundation/OpenAEC-style-book), local revision `dfdcd415b26604081b1699560621d3e9ae7ea6bf`. Reuses the theme definitions, ribbon components and OpenAEC logo; the Paint shell follows its desktop workspace structure. No BIM/reporting modules from the template are included.
 
 OpenAEC brand assets and template-derived components remain **CC BY-SA 4.0**. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). New editor and service code is MIT licensed.
+
+### Linux user installation
+
+Build a DEB with `pnpm tauri build --bundles deb`, then run `node scripts/install-linux.mjs "path/to/OpenAEC Paint Studio_0.1.0_amd64.deb"`. The installer checks system libraries, installs under `~/.local/share/openaec-paint-studio`, creates a launcher and menu entry, and associates supported image types and `.oapaint` projects for the current user. Previous MIME defaults are saved under `~/.local/state/openaec-paint-studio`. No administrator password is needed. Opening an associated file imports it into the editor; each Linux launch opens its own window.
