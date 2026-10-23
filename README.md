@@ -6,7 +6,7 @@ A small image editor inspired by MS Paint, using the OpenAEC application style. 
 
 - Smooth brush strokes, eraser, flood fill, eyedropper, lines, rectangles, ellipses and inline text editing.
 - Brush size, opacity, filled/outlined shapes and a color palette.
-- Crop, resize, rotate left/right and flip horizontally/vertically. Image and view controls are also available on Home. Focus mode enlarges the drawing workspace.
+- Crop, resize, rotate left/right and flip horizontally/vertically. The Home ribbon brings drawing tools, text/object properties, image operations, view controls and canvas settings together. Focus mode enlarges the drawing workspace.
 - Optional **Keep vector objects**: select, move, resize and restyle drawn shapes/text. Geometry transforms preserve these objects. Export editable SVG.
 - Brightness, contrast, saturation, grayscale, invert and sepia. Raster corrections flatten the image; undo restores the original objects.
 - Open PNG, JPEG, WebP, GIF, BMP, TIFF, HEIC/HEIF, AVIF, PSD, SVG, ICO, TGA, JPEG 2000, JPEG XL and supported camera RAW variants, plus `.oapaint` projects.

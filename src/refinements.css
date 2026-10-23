@@ -3,3 +3,16 @@
 @media(max-width:1100px){.quick-strip{padding:4px 10px;gap:2px}.quick-strip>button,.quick-strip summary{padding:5px 6px;font-size:9px}.vector-toggle{font-size:9px}.paint-ribbon .ribbon-group{padding:0 10px}.inspector{width:215px}}
 @media(max-width:760px){.quick-strip{row-gap:2px}.vector-toggle{margin-left:0}.canvas-view-controls>span{display:none}.workspace-topline{padding:0 12px}.tool-rail{width:47px;padding:7px 5px}.tool-rail button{width:32px;height:31px}.quick-strip>button:last-child{margin-left:auto}.canvas-view-controls button{font-size:9px}.ribbon-tabs{padding:2px 7px 0}.ribbon-tab{padding:7px 10px}}
 @media(max-height:760px){.inspector-section{padding:11px 15px}.inspector-section h3{margin-bottom:12px}.tool-rail{gap:2px}.tool-rail button{height:28px}.panel-heading{padding:11px 15px}}
+/* All editing controls live on the Home ribbon. */
+.paint-ribbon.home-ribbon{height:auto;min-height:104px;max-height:270px;overflow:auto;flex-wrap:wrap;gap:8px 0;padding:8px 8px 5px;align-content:flex-start;position:relative;z-index:6}
+.home-ribbon .ribbon-group{height:auto;min-height:85px;flex-shrink:0;padding:0 10px}
+.home-ribbon .ribbon-group-content{align-items:center;gap:4px}
+.home-ribbon .ribbon-group-label{margin-top:auto}
+.home-ribbon .action{min-height:48px;padding:5px 7px;font-size:10px}
+.ribbon-controls{display:grid;grid-template-rows:repeat(3,25px);grid-auto-flow:column;gap:1px 5px;align-items:center}
+.ribbon-controls>button,.ribbon-controls summary{font-size:10px;padding:4px 7px;min-height:24px;border-radius:6px;white-space:nowrap;justify-content:flex-start}
+.ribbon-controls .action{min-height:24px;flex-direction:row;padding:4px 7px;gap:6px}.ribbon-controls .action svg{width:15px;height:15px}
+.ribbon-settings{display:flex;flex-direction:column;justify-content:center;gap:5px;min-width:125px;max-width:210px;font-size:10px}
+.ribbon-settings label{display:flex;align-items:center;gap:6px;justify-content:space-between;white-space:nowrap;margin:0}
+.ribbon-settings label span{margin-left:auto}.ribbon-settings select{font-size:10px;padding:3px 5px;max-width:130px}.ribbon-settings input[type=range]{width:130px;margin:0}.ribbon-settings input[type=checkbox]{margin:0}.ribbon-settings .vector-toggle{margin-left:0;justify-content:flex-start}
+.ribbon-settings>button,.ribbon-small-button{font-size:10px;padding:4px 7px;border:1px solid var(--theme-border);border-radius:6px;min-height:24px}.ribbon-settings .object-actions{margin:0;gap:3px}.home-ribbon .tool-menu>div{position:fixed;left:auto;top:auto;margin-top:3px}.home-ribbon .tool-menu>div button{font-size:11px}.home-ribbon .ribbon-tools{grid-template-columns:repeat(3,29px)}

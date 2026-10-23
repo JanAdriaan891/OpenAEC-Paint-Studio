@@ -8,7 +8,7 @@ test('draw, undo/redo, export, transform and restore a local draft', async ({ pa
   await page.goto('/');
   await expect(page.getByText('Concept opgeslagen op dit apparaat', { exact: true })).toBeVisible();
   const surface = page.getByLabel('Drawing surface', { exact: true }); const box = await surface.boundingBox(); expect(box).not.toBeNull();
-  await page.getByRole('button', { name: 'Rechthoek R', exact: true }).click();
+  await page.getByRole('button', { name: 'Rechthoek', exact: true }).click();
   await page.mouse.move(box!.x + 35, box!.y + 35); await page.mouse.down(); await page.mouse.move(box!.x + 200, box!.y + 150, { steps: 10 }); await page.mouse.up();
   await expect(page.locator('.history-item')).toHaveCount(1);
   await page.getByRole('button', { name: 'Undo', exact: true }).click(); await expect(page.locator('.history-item')).toHaveCount(0);
@@ -46,15 +46,15 @@ test('Start exposes image controls, inline text and retained SVG objects',async(
   await expect(page.getByRole('button',{name:'Formaat wijzigen',exact:true})).toBeVisible();
   await expect(page.getByRole('checkbox',{name:'Vectorobjecten behouden',exact:true})).toBeChecked();
   const surface=page.getByLabel('Drawing surface',{exact:true}),box=await surface.boundingBox();expect(box).not.toBeNull();
-  await page.getByRole('button',{name:'Tekst T',exact:true}).click();await surface.click({position:{x:60,y:60}});
+  await page.getByRole('button',{name:'Tekst',exact:true}).click();await surface.click({position:{x:60,y:60}});
   await page.getByLabel('Tekstinhoud',{exact:true}).fill('Editable vector');await page.getByRole('button',{name:'Tekst toepassen',exact:true}).click();
   await expect(page.locator('.history-item')).toHaveCount(1);
-  await page.getByRole('button',{name:'Objecten selecteren V',exact:true}).click();
+  await page.getByRole('button',{name:'Objecten selecteren',exact:true}).click();
   await surface.click({position:{x:65,y:65}});await expect(page.locator('.selection-outline')).toBeVisible();
   await page.mouse.move(box!.x+65,box!.y+65);await page.mouse.down();await page.mouse.move(box!.x+120,box!.y+110,{steps:5});await page.mouse.up();
   const downloadEvent=page.waitForEvent('download');await page.getByRole('button',{name:'SVG',exact:true}).click();
   const downloaded=await downloadEvent;const path=await downloaded.path();expect(path).not.toBeNull();const svg=readFileSync(path!,'utf8');expect(svg).toContain('<text');expect(svg).toContain('Editable vector');expect(svg).not.toContain('<image');
-  await page.getByRole('button',{name:'Focusmodus',exact:true}).click();await expect(page.locator('.paint-ribbon')).not.toBeVisible();await page.getByRole('button',{name:'Focusmodus',exact:true}).click();await expect(page.locator('.paint-ribbon')).toBeVisible();
+  await page.getByRole('button',{name:'Focusmodus',exact:true}).first().click();await expect(page.locator('.paint-ribbon')).not.toBeVisible();await page.getByRole('button',{name:'Focusmodus',exact:true}).first().click();await expect(page.locator('.paint-ribbon')).toBeVisible();
 });
 test('browser worker decodes a TIFF without a backend',async({page})=>{
   await initializeDecoder(readFileSync(new URL(import.meta.resolve('@imagemagick/magick-wasm/magick.wasm'))));
