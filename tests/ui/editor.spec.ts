@@ -172,3 +172,32 @@ test('Save uses IFCX with an embedded PNG',async({page})=>{
   const image=await readRasterIfcx(new Uint8Array(readFileSync((await file.path())!)));
   expect(image.width).toBe(1200);expect(image.height).toBe(800);
 });
+
+test('Ctrl + wheel zooms the canvas while ordinary wheel keeps the zoom level', async ({page}) => {
+  await page.goto('/');
+  await expect(page.getByText('Concept opgeslagen op dit apparaat', {exact:true})).toBeVisible();
+  const zoom = page.locator('.statusbar input[type=range]');
+  const initial = Number(await zoom.inputValue());
+  await page.getByLabel('Drawing surface', {exact:true}).hover();
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -100);
+  await expect(zoom).toHaveValue(String(initial + 10));
+  await page.mouse.wheel(0, 100);
+  await expect(zoom).toHaveValue(String(initial));
+  await page.keyboard.up('Control');
+  await page.mouse.wheel(0, 100);
+  await page.waitForTimeout(150);
+  await expect(zoom).toHaveValue(String(initial));
+  for (const [key, delta, limit] of [['End', -100, '400'], ['Home', 100, '10']] as const) {
+    await zoom.focus();
+    await page.keyboard.press(key);
+    await expect(zoom).toHaveValue(limit);
+    const bounds = await page.locator('.canvas-workspace').boundingBox();
+    await page.mouse.move(bounds!.x + 20, bounds!.y + 60);
+    await page.keyboard.down('Control');
+    await page.mouse.wheel(0, delta);
+    await page.keyboard.up('Control');
+    await page.waitForTimeout(150);
+    await expect(zoom).toHaveValue(limit);
+  }
+});

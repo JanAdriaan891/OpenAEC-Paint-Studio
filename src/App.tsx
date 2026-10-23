@@ -145,6 +145,18 @@ export default function App() {
   }, [doc.width, doc.height]);
   useEffect(() => { if (loaded) fit(); }, [loaded, fit,focus,inspectorOpen]);
   useEffect(()=>{const observer=new ResizeObserver(()=>fit());if(workspace.current)observer.observe(workspace.current);return()=>observer.disconnect();},[fit]);
+  useEffect(() => {
+    const element = workspace.current;
+    if (!element) return;
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey || event.deltaY === 0) return;
+      event.preventDefault();
+      setZoom(value => Math.max(10, Math.min(400, value + (event.deltaY < 0 ? 10 : -10))));
+    };
+    // A non-passive listener prevents browser page zoom over the drawing area.
+    element.addEventListener('wheel', onWheel, { passive: false });
+    return () => element.removeEventListener('wheel', onWheel);
+  }, []);
   useEffect(()=>{setSelection(index=>index!==null&&index>=doc.operations.length?null:index);},[doc.operations.length]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
