@@ -23,3 +23,5 @@
 .ribbon-menu-panel>button,.ribbon-menu-panel .ribbon-small-button{width:100%;min-height:33px;justify-content:flex-start;font-size:11px;padding:7px 10px;text-align:left;border-radius:5px}.ribbon-menu-panel hr{border:0;border-top:1px solid var(--theme-border);width:100%;margin:4px 0}.ribbon-menu-panel>label{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 6px;font-size:11px}.ribbon-menu-panel select{font-size:11px;padding:5px;max-width:115px}.ribbon-menu-panel .object-actions{margin:0;gap:2px}.home-ribbon:has(.ribbon-menu[open]){z-index:20}
 @media(max-width:1280px){.home-ribbon .ribbon-group{padding:0 9px}.home-ribbon .color-control{gap:6px}.home-ribbon .palette{gap:3px}}
 .focus-mode .paint-ribbon.home-ribbon{display:none}
+
+.canvas-scroll.panning,.canvas-scroll.panning *{cursor:grabbing!important;user-select:none}

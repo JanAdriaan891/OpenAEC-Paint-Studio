@@ -157,6 +157,51 @@ export default function App() {
     element.addEventListener('wheel', onWheel, { passive: false });
     return () => element.removeEventListener('wheel', onWheel);
   }, []);
+  useEffect(() => {
+    const element = workspace.current?.querySelector<HTMLDivElement>('.canvas-scroll');
+    if (!element) return;
+    let pan: { pointerId: number; x: number; y: number; left: number; top: number } | null = null;
+    const stop = () => {
+      const pointerId = pan?.pointerId;
+      pan = null;
+      element.classList.remove('panning');
+      if (pointerId !== undefined && element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
+    };
+    const down = (event: globalThis.PointerEvent) => {
+      if (event.button !== 1 || gesture.current || objectDrag.current) return;
+      event.preventDefault(); event.stopPropagation();
+      pan = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, left: element.scrollLeft, top: element.scrollTop };
+      element.setPointerCapture(event.pointerId);
+      element.classList.add('panning');
+    };
+    const move = (event: globalThis.PointerEvent) => {
+      if (!pan || event.pointerId !== pan.pointerId) return;
+      event.preventDefault(); event.stopPropagation();
+      if (!(event.buttons & 4)) { stop(); return; }
+      element.scrollLeft = pan.left - (event.clientX - pan.x);
+      element.scrollTop = pan.top - (event.clientY - pan.y);
+    };
+    const up = (event: globalThis.PointerEvent) => {
+      if (!pan || event.pointerId !== pan.pointerId) return;
+      event.preventDefault(); event.stopPropagation(); stop();
+    };
+    const auxClick = (event: MouseEvent) => { if (event.button === 1) event.preventDefault(); };
+    element.addEventListener('pointerdown', down, true);
+    element.addEventListener('pointermove', move, true);
+    element.addEventListener('pointerup', up, true);
+    element.addEventListener('pointercancel', up, true);
+    element.addEventListener('lostpointercapture', stop);
+    element.addEventListener('auxclick', auxClick);
+    return () => {
+      stop();
+      element.removeEventListener('pointerdown', down, true);
+      element.removeEventListener('pointermove', move, true);
+      element.removeEventListener('pointerup', up, true);
+      element.removeEventListener('pointercancel', up, true);
+      element.removeEventListener('lostpointercapture', stop);
+      element.removeEventListener('auxclick', auxClick);
+    };
+  }, []);
   useEffect(()=>{setSelection(index=>index!==null&&index>=doc.operations.length?null:index);},[doc.operations.length]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

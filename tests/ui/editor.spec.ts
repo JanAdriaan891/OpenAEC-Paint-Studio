@@ -201,3 +201,28 @@ test('Ctrl + wheel zooms the canvas while ordinary wheel keeps the zoom level', 
     await expect(zoom).toHaveValue(limit);
   }
 });
+
+test('holding the middle mouse button pans without drawing and releases outside the canvas', async ({page}) => {
+  await page.goto('/');
+  await expect(page.getByText('Concept opgeslagen op dit apparaat', {exact:true})).toBeVisible();
+  const zoom = page.locator('.statusbar input[type=range]');
+  await zoom.focus(); await page.keyboard.press('End');
+  const scroll = page.locator('.canvas-scroll');
+  await scroll.evaluate(element => { element.scrollLeft = 250; element.scrollTop = 250; });
+  const box = (await scroll.boundingBox())!;
+  const x = box.x + 200, y = box.y + 200;
+  await page.mouse.move(x, y);
+  await page.mouse.down({button:'middle'});
+  await page.mouse.move(x + 80, y + 60, {steps:4});
+  await expect(scroll).toHaveClass(/panning/);
+  await expect.poll(() => scroll.evaluate(element => [element.scrollLeft, element.scrollTop])).toEqual([170, 190]);
+  await page.mouse.move(x, box.y - 20, {steps:4});
+  await page.mouse.up({button:'middle'});
+  await expect(scroll).not.toHaveClass(/panning/);
+  await expect(page.locator('.history-item')).toHaveCount(0);
+  const after = await scroll.evaluate(element => [element.scrollLeft, element.scrollTop]);
+  await page.mouse.move(x + 20, y + 20);
+  expect(await scroll.evaluate(element => [element.scrollLeft, element.scrollTop])).toEqual(after);
+  await page.mouse.down(); await page.mouse.move(x + 50, y + 50, {steps:3}); await page.mouse.up();
+  await expect(page.locator('.history-item')).toHaveCount(1);
+});
