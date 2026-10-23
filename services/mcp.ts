@@ -1,3 +1,4 @@
+import { packageVersion } from '../shared/version.js';
 import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
@@ -16,7 +17,7 @@ async function jsonRequest(path: string, method = 'GET', body?: unknown) {
 const textResult = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
 const id = z.string().uuid();
 function createMcp() {
-  const server = new McpServer({ name: 'openaec-paint-studio', version: '0.1.0' });
+  const server = new McpServer({ name: 'openaec-paint-studio', version: packageVersion });
   server.registerTool('paint_list_documents', { description: 'List documents stored in the local Paint API workspace.', inputSchema: z.object({}) }, async () => textResult(await jsonRequest('/v1/documents')));
   server.registerTool('paint_create_document', { description: 'Create a blank Paint document. Returns its UUID and revision. The user can load it in the app via Automation.', inputSchema: z.object({ name: z.string().min(1).max(120), width: z.number().int().min(16).max(4096).default(1200), height: z.number().int().min(16).max(4096).default(800) }) }, async ({ name, width, height }) => textResult(await jsonRequest('/v1/documents', 'POST', newDocument(width, height, name))));
   server.registerTool('paint_get_document', { description: 'Read a document and its current revision before modifying it.', inputSchema: z.object({ id }) }, async ({ id }) => textResult(await jsonRequest(`/v1/documents/${id}`)));

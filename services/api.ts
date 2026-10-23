@@ -1,3 +1,4 @@
+import { packageVersion } from '../shared/version.js';
 import { createServer, type IncomingMessage } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { resolve } from 'node:path';
@@ -35,7 +36,7 @@ export function createApi({ directory = dataDir, token = apiToken(true) }: { dir
       if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) throw new HttpError(401, 'Valid bearer token required');
       const url = new URL(req.url || '/', 'http://127.0.0.1');
       const segments = url.pathname.split('/').filter(Boolean);
-      if (url.pathname === '/health' && req.method === 'GET') return json({ name: 'openaec-paint-studio', version: '0.1.0', status: 'ok' });
+      if (url.pathname === '/health' && req.method === 'GET') return json({ name: 'openaec-paint-studio', version: packageVersion, status: 'ok' });
       if (segments[0] !== 'v1' || segments[1] !== 'documents') throw new HttpError(404, 'Route not found');
       if (segments.length === 2) {
         if (req.method === 'GET') return json(store.list());
