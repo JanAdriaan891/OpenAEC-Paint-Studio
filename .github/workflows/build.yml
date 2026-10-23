@@ -23,8 +23,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: PAINT_TEST_PRODUCTION=1 pnpm test:ui
+      - name: Use the runner-provided Chrome browser
+        run: google-chrome --version
+      - run: PAINT_TEST_PRODUCTION=1 PAINT_TEST_BROWSER_CHANNEL=chrome pnpm test:ui
       - uses: actions/upload-artifact@v4
         with:
           name: web-and-services
