@@ -1,1 +1,52 @@
 # OpenAEC Paint Studio
+
+A small image editor inspired by MS Paint, using the OpenAEC application style. Runs as a browser app or a Tauri 2 desktop application.
+
+## Editor
+
+- Smooth brush strokes, eraser, flood fill, eyedropper, lines, rectangles, ellipses and inline text editing.
+- Brush size, opacity, filled/outlined shapes and a color palette.
+- Crop, resize, rotate left/right and flip horizontally/vertically. Image and view controls are also available on Home. Focus mode enlarges the drawing workspace.
+- Optional **Keep vector objects**: select, move, resize and restyle drawn shapes/text. Geometry transforms preserve these objects. Export editable SVG.
+- Brightness, contrast, saturation, grayscale, invert and sepia. Raster corrections flatten the image; undo restores the original objects.
+- Open PNG, JPEG, WebP, GIF, BMP, TIFF, HEIC/HEIF, AVIF, PSD, SVG, ICO, TGA, JPEG 2000, JPEG XL and supported camera RAW variants, plus `.oapaint` projects.
+- Native browser decoders handle common images; a bundled ImageMagick WebAssembly worker handles additional formats locally. See [format support and limits](docs/IMAGE-FORMATS.md).
+- Export PNG, JPEG, WebP or SVG; save an editable `.oapaint` project.
+- Undo/redo (40 recent document states), zoom, pixel grid and local draft recovery using IndexedDB.
+- Dutch and English; light, Forge, OpenAEC, Blueprint and high contrast themes. Fonts are bundled for offline use.
+
+## Run
+
+Use Node.js 22+ and pnpm 11.25.0. The desktop app additionally needs Rust stable and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/).
+
+```sh
+pnpm install --frozen-lockfile
+pnpm dev                 # http://127.0.0.1:3020
+pnpm tauri dev           # native desktop window
+pnpm build               # dist/ + dist-services/
+pnpm test                # renderer, formats, vectors, API, MCP and signing tests
+pnpm exec playwright install chromium
+pnpm test:ui             # browser integration tests
+pnpm tauri build --bundles deb,appimage  # Linux
+```
+
+Other native targets: `--bundles nsis` on Windows, `--bundles app,dmg` on macOS. Installers are written to `src-tauri/target/release/bundle/`. The API/MCP are separate Node processes and are not automatically started by the desktop installer.
+
+## API and MCP
+
+```sh
+pnpm api                 # loopback only: http://127.0.0.1:47831
+pnpm mcp                 # MCP stdio; normally launched by your MCP host
+```
+
+The API generates a private token at `.paint-data/token`. Enter this token in **Automation → Connect API**. Send the current image to the API or load an API document by ID. UI changes are exchanged explicitly: this is not live synchronization. Revision checks prevent one client from silently overwriting another's edits.
+
+After building, the services also run with `node dist-services/services/api.js` and `node dist-services/services/mcp.js` (install production dependencies first).
+
+See [API](docs/API.md), [MCP](docs/MCP.md), and [builds and signing](docs/RELEASING.md).
+
+## Style provenance
+
+Adapted from [OpenAEC-Foundation/OpenAEC-style-book](https://github.com/OpenAEC-Foundation/OpenAEC-style-book), local revision `dfdcd415b26604081b1699560621d3e9ae7ea6bf`. Reuses the theme definitions, ribbon components and OpenAEC logo; the Paint shell follows its desktop workspace structure. No BIM/reporting modules from the template are included.
+
+OpenAEC brand assets and template-derived components remain **CC BY-SA 4.0**. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). New editor and service code is MIT licensed.

@@ -1,0 +1,51 @@
+{
+  "name": "openaec-paint-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 3020 --strictPort",
+    "build": "tsc --noEmit && vite build && pnpm build:services",
+    "build:services": "tsc -p tsconfig.services.json",
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "api": "tsx services/api.ts",
+    "mcp": "tsx services/mcp.ts",
+    "test": "tsx --test tests/*.test.ts",
+    "test:ui": "playwright test",
+    "tauri": "tauri",
+    "desktop:build": "tauri build",
+    "sign": "node scripts/sign.mjs",
+    "verify": "node scripts/verify.mjs"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/space-grotesk": "^5.2.10",
+    "@imagemagick/magick-wasm": "0.0.44",
+    "@modelcontextprotocol/server": "^2.3.1",
+    "@napi-rs/canvas": "^0.1.80",
+    "@tauri-apps/api": "^2.8.0",
+    "@tauri-apps/plugin-dialog": "^2.4.0",
+    "@tauri-apps/plugin-fs": "^2.4.0",
+    "@tauri-apps/plugin-store": "^2.4.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.3.1",
+    "@playwright/test": "^1.56.0",
+    "@tauri-apps/cli": "^2.8.0",
+    "@types/node": "^22.18.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  }
+}

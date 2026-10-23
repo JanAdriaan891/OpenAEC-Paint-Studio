@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": false, "outDir": "dist-services", "rootDir": ".", "module": "NodeNext", "moduleResolution": "NodeNext", "sourceMap": true },
+  "include": ["services", "shared"]
+}

@@ -1,0 +1,138 @@
+name: Build and verify
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      sign:
+        description: Sign release artifacts with the configured Ed25519 release key
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: PAINT_TEST_PRODUCTION=1 pnpm test:ui
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-and-services
+          path: |
+            dist/
+            dist-services/
+            package.json
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            docs/
+  desktop:
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            bundles: deb,appimage
+          - os: windows-latest
+            bundles: nsis
+          - os: macos-latest
+            bundles: app,dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Linux libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libxdo-dev
+      - run: pnpm install --frozen-lockfile
+      - name: Import optional Windows signing certificate
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ($env:CERTIFICATE) {
+            $path = Join-Path $env:RUNNER_TEMP 'paint-signing.pfx'
+            [IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($env:CERTIFICATE))
+            $password = ConvertTo-SecureString $env:CERTIFICATE_PASSWORD -AsPlainText -Force
+            $cert = Import-PfxCertificate -FilePath $path -CertStoreLocation Cert:\CurrentUser\My -Password $password | Where-Object { $_.HasPrivateKey } | Select-Object -First 1
+            if (-not $cert) { throw 'The PFX does not contain a signing private key' }
+            @{ bundle = @{ windows = @{ certificateThumbprint = $cert.Thumbprint; digestAlgorithm = 'sha256'; timestampUrl = 'http://timestamp.digicert.com' } } } | ConvertTo-Json -Depth 5 | Set-Content -Path native-signing.json
+            Remove-Item $path
+          }
+      - name: Import optional macOS signing certificate
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE" ]; then
+            test -n "$APPLE_SIGNING_IDENTITY" || { echo 'APPLE_SIGNING_IDENTITY is required'; exit 1; }
+            node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/paint.p12", Buffer.from(process.env.APPLE_CERTIFICATE,"base64"), {mode:384})'
+            PAINT_KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+            security create-keychain -p "$PAINT_KEYCHAIN_PASSWORD" "$RUNNER_TEMP/paint.keychain-db"
+            security set-keychain-settings -lut 21600 "$RUNNER_TEMP/paint.keychain-db"
+            security unlock-keychain -p "$PAINT_KEYCHAIN_PASSWORD" "$RUNNER_TEMP/paint.keychain-db"
+            security import "$RUNNER_TEMP/paint.p12" -k "$RUNNER_TEMP/paint.keychain-db" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$PAINT_KEYCHAIN_PASSWORD" "$RUNNER_TEMP/paint.keychain-db"
+            security list-keychains -d user -s "$RUNNER_TEMP/paint.keychain-db" login.keychain-db
+            rm "$RUNNER_TEMP/paint.p12"
+          fi
+      - name: Native build
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || '-' }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -f native-signing.json ]; then
+            pnpm tauri build --bundles '${{ matrix.bundles }}' --config native-signing.json
+          else
+            pnpm tauri build --bundles '${{ matrix.bundles }}'
+          fi
+      - name: Sign and verify distributable artifacts
+        if: github.event_name == 'workflow_dispatch' && inputs.sign
+        env:
+          RELEASE_KEY: ${{ secrets.PAINT_RELEASE_SIGNING_KEY }}
+        run: node scripts/sign-builds.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.manifest.json
+            src-tauri/target/release/bundle/**/*.sig
+            src-tauri/target/release/bundle/**/*.pub.pem
+      - name: Remove temporary macOS keychain
+        if: always() && runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/paint.keychain-db" ]; then
+            security delete-keychain "$RUNNER_TEMP/paint.keychain-db"
+          fi

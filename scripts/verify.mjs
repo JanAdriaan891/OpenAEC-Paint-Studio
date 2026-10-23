@@ -1,0 +1,11 @@
+import { createPublicKey, verify, createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { basename } from 'node:path';
+const [artifact, publicKey] = process.argv.slice(2);
+if (!artifact || !publicKey) throw new Error('Usage: pnpm verify <artifact> <trusted-public-key.pem>');
+const bytes = readFileSync(artifact), manifest = readFileSync(`${artifact}.manifest.json`);
+const signature = Buffer.from(readFileSync(`${artifact}.sig`, 'utf8').trim(), 'base64');
+if (!verify(null, manifest, createPublicKey(readFileSync(publicKey)), signature)) throw new Error('Invalid release signature');
+const data = JSON.parse(manifest.toString());
+if (data.schema !== 1 || data.file !== basename(artifact) || data.bytes !== bytes.length || data.sha256 !== createHash('sha256').update(bytes).digest('hex')) throw new Error('Artifact does not match signed manifest');
+console.log('Release signature and artifact SHA-256 verified.');

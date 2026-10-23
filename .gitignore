@@ -1,0 +1,16 @@
+node_modules/
+dist/
+dist-services/
+src-tauri/target/
+src-tauri/gen/
+.paint-data/
+.env
+*.key
+*.pem
+!release-public.pem
+*.p12
+*.pfx
+test-results/
+playwright-report/
+artifacts/
+native-signing.json

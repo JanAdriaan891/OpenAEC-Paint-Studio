@@ -1,0 +1,20 @@
+[package]
+name = "openaec-paint-studio"
+version = "0.1.0"
+description = "OpenAEC Paint Studio — raster drawing for the built environment"
+authors = ["OpenAEC contributors"]
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "openaec_paint_studio_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-store = "2"

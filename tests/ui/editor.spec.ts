@@ -1,0 +1,83 @@
+import { test, expect } from '@playwright/test';
+import { createCanvas } from '@napi-rs/canvas';
+import { ImageMagick,MagickColors,MagickFormat } from '@imagemagick/magick-wasm';
+import { initializeDecoder } from '../../shared/image-decoder';
+import { readFileSync } from 'node:fs';
+import { newDocument } from '../../shared/document';
+test('draw, undo/redo, export, transform and restore a local draft', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByText('Concept opgeslagen op dit apparaat', { exact: true })).toBeVisible();
+  const surface = page.getByLabel('Drawing surface', { exact: true }); const box = await surface.boundingBox(); expect(box).not.toBeNull();
+  await page.getByRole('button', { name: 'Rechthoek R', exact: true }).click();
+  await page.mouse.move(box!.x + 35, box!.y + 35); await page.mouse.down(); await page.mouse.move(box!.x + 200, box!.y + 150, { steps: 10 }); await page.mouse.up();
+  await expect(page.locator('.history-item')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click(); await expect(page.locator('.history-item')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click(); await expect(page.locator('.history-item')).toHaveCount(1);
+  const downloadEvent = page.waitForEvent('download'); await page.getByRole('button', { name: 'PNG exporteren', exact: true }).click();
+  const download = await downloadEvent; expect(download.suggestedFilename()).toBe('Untitled.png'); expect(await download.failure()).toBeNull();
+  await page.getByRole('button', { name: 'Afbeelding', exact: true }).click(); await page.getByRole('button', { name: '90° draaien', exact: true }).click();
+  await expect(page.locator('.dimension-pair')).toContainText('800');
+  await expect(page.locator('.dimension-pair > div').first()).toContainText('800');
+  await expect(page.getByText('Concept opgeslagen op dit apparaat', { exact: true })).toBeVisible();
+  await page.reload(); await expect(page.locator('.dimension-pair > div').first()).toContainText('800'); await expect(page.locator('.history-item')).toHaveCount(1);
+});
+test('settings switch language and theme', async ({ page }) => {
+  await page.goto('/'); await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const dialog = page.getByRole('dialog'); await dialog.getByLabel('Thema', { exact: true }).selectOption('forge'); await dialog.getByLabel('Taal', { exact: true }).selectOption('en');
+  await expect(dialog.getByRole('heading', { name: 'Settings' })).toBeVisible(); await expect(page.locator('html')).toHaveAttribute('data-theme', 'forge');
+});
+test('open an image, resize it and crop a region', async ({ page }) => {
+  const sample = createCanvas(100, 80), ctx = sample.getContext('2d');
+  ctx.fillStyle = '#2563eb'; ctx.fillRect(0, 0, 100, 80);
+  await page.goto('/'); await expect(page.getByText('Concept opgeslagen op dit apparaat', { exact: true })).toBeVisible();
+  await page.locator('input[type=file]').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: sample.toBuffer('image/png') });
+  await expect(page.locator('.dimension-pair > div').first()).toContainText('100',{timeout:25000});
+  await page.getByRole('button', { name: 'Afbeelding', exact: true }).click(); await page.getByRole('button', { name: 'Formaat wijzigen', exact: true }).click();
+  const dialog = page.getByRole('dialog'); await dialog.getByLabel('Breedte', { exact: true }).fill('120'); await dialog.getByLabel('Hoogte', { exact: true }).fill('100'); await dialog.getByRole('button', { name: 'Toepassen', exact: true }).click();
+  await expect(page.locator('.dimension-pair > div').first()).toContainText('120');
+  await page.getByRole('button', { name: 'Bijsnijden', exact: true }).click();
+  const surface = page.getByLabel('Drawing surface', { exact: true }); const box = await surface.boundingBox(); expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width * .2, box!.y + box!.height * .2); await page.mouse.down(); await page.mouse.move(box!.x + box!.width * .8, box!.y + box!.height * .8, { steps: 5 }); await page.mouse.up();
+  await expect(page.locator('.dimension-pair > div').first()).toContainText('72'); await expect(page.locator('.dimension-pair > div').last()).toContainText('60');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click(); await expect(page.locator('.dimension-pair > div').first()).toContainText('120');
+});
+test('Start exposes image controls, inline text and retained SVG objects',async({page})=>{
+  await page.goto('/');await expect(page.getByText('Concept opgeslagen op dit apparaat',{exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Formaat wijzigen',exact:true})).toBeVisible();
+  await expect(page.getByRole('checkbox',{name:'Vectorobjecten behouden',exact:true})).toBeChecked();
+  const surface=page.getByLabel('Drawing surface',{exact:true}),box=await surface.boundingBox();expect(box).not.toBeNull();
+  await page.getByRole('button',{name:'Tekst T',exact:true}).click();await surface.click({position:{x:60,y:60}});
+  await page.getByLabel('Tekstinhoud',{exact:true}).fill('Editable vector');await page.getByRole('button',{name:'Tekst toepassen',exact:true}).click();
+  await expect(page.locator('.history-item')).toHaveCount(1);
+  await page.getByRole('button',{name:'Objecten selecteren V',exact:true}).click();
+  await surface.click({position:{x:65,y:65}});await expect(page.locator('.selection-outline')).toBeVisible();
+  await page.mouse.move(box!.x+65,box!.y+65);await page.mouse.down();await page.mouse.move(box!.x+120,box!.y+110,{steps:5});await page.mouse.up();
+  const downloadEvent=page.waitForEvent('download');await page.getByRole('button',{name:'SVG',exact:true}).click();
+  const downloaded=await downloadEvent;const path=await downloaded.path();expect(path).not.toBeNull();const svg=readFileSync(path!,'utf8');expect(svg).toContain('<text');expect(svg).toContain('Editable vector');expect(svg).not.toContain('<image');
+  await page.getByRole('button',{name:'Focusmodus',exact:true}).click();await expect(page.locator('.paint-ribbon')).not.toBeVisible();await page.getByRole('button',{name:'Focusmodus',exact:true}).click();await expect(page.locator('.paint-ribbon')).toBeVisible();
+});
+test('browser worker decodes a TIFF without a backend',async({page})=>{
+  await initializeDecoder(readFileSync(new URL(import.meta.resolve('@imagemagick/magick-wasm/magick.wasm'))));
+  const bytes=ImageMagick.read(MagickColors.Blue,80,64,image=>image.write(MagickFormat.Tiff,data=>Buffer.from(data)));
+  await page.goto('/');await expect(page.getByText('Concept opgeslagen op dit apparaat',{exact:true})).toBeVisible();
+  await page.locator('input[type=file]').setInputFiles({name:'scan.tiff',mimeType:'image/tiff',buffer:bytes});
+  await expect(page.locator('.dimension-pair > div').first()).toContainText('80',{timeout:25000});await expect(page.locator('.dimension-pair > div').last()).toContainText('64');
+  await expect(page.locator('.history-item')).toHaveCount(1);
+});
+test('SVG import uses the browser renderer',async({page})=>{
+  await page.goto('/');await expect(page.getByText('Concept opgeslagen op dit apparaat',{exact:true})).toBeVisible();
+  const svg='<svg xmlns="http://www.w3.org/2000/svg" width="96" height="64"><rect width="96" height="64" fill="#d97706"/></svg>';
+  await page.locator('input[type=file]').setInputFiles({name:'drawing.svg',mimeType:'image/svg+xml',buffer:Buffer.from(svg)});
+  await expect(page.locator('.dimension-pair > div').first()).toContainText('96');await expect(page.locator('.dimension-pair > div').last()).toContainText('64');
+});
+test('cropping retains a fill when its original seed lies outside the crop',async({page})=>{
+  await page.goto('/');await expect(page.getByText('Concept opgeslagen op dit apparaat',{exact:true})).toBeVisible();
+  const doc={...newDocument(64,64),operations:[{type:'fill',at:{x:5,y:5},color:'#d97706'}]};
+  await page.locator('input[type=file]').setInputFiles({name:'filled.oapaint',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(doc))});
+  await expect(page.locator('.dimension-pair > div').first()).toContainText('64');
+  await page.getByRole('button',{name:'Bijsnijden',exact:true}).click();
+  const surface=page.getByLabel('Drawing surface',{exact:true}),box=await surface.boundingBox();expect(box).not.toBeNull();
+  await page.mouse.move(box!.x+box!.width*.25,box!.y+box!.height*.25);await page.mouse.down();await page.mouse.move(box!.x+box!.width*.75,box!.y+box!.height*.75,{steps:4});await page.mouse.up();
+  await expect(page.locator('.dimension-pair > div').first()).toContainText('32');
+  await expect.poll(()=>page.locator('canvas.drawing').first().evaluate(canvas=>Array.from((canvas as HTMLCanvasElement).getContext('2d')!.getImageData(1,1,1,1).data))).toEqual([217,119,6,255]);
+});
