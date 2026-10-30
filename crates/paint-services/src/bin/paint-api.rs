@@ -1,2 +1,21 @@
 #[tokio::main]
-async fn main()->anyhow::Result<()>{let dir=paint_services::store::data_directory();let token=paint_services::store::api_token(&dir)?;let store=paint_services::store::Store::new(dir.join("documents"))?;let port=std::env::var("PAINT_API_PORT").unwrap_or_else(|_|"47831".into()).parse::<u16>()?;anyhow::ensure!(port>0,"Invalid port");let listener=tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST,port)).await?;eprintln!("OpenAEC Paint API (Rust): http://127.0.0.1:{port}; token file: {}",dir.join("token").display());axum::serve(listener,paint_services::api::router(store,token)).with_graceful_shutdown(async{let _=tokio::signal::ctrl_c().await;}).await?;Ok(())}
+async fn main() -> anyhow::Result<()> {
+    let dir = paint_services::store::data_directory();
+    let token = paint_services::store::api_token(&dir)?;
+    let store = paint_services::store::Store::new(dir.join("documents"))?;
+    let port = std::env::var("PAINT_API_PORT")
+        .unwrap_or_else(|_| "47831".into())
+        .parse::<u16>()?;
+    anyhow::ensure!(port > 0, "Invalid port");
+    let listener = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).await?;
+    eprintln!(
+        "OpenAEC Paint API (Rust): http://127.0.0.1:{port}; token file: {}",
+        dir.join("token").display()
+    );
+    axum::serve(listener, paint_services::api::router(store, token))
+        .with_graceful_shutdown(async {
+            let _ = tokio::signal::ctrl_c().await;
+        })
+        .await?;
+    Ok(())
+}

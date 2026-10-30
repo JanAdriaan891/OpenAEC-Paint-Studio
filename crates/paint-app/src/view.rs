@@ -1,76 +1,1084 @@
-use crate::{*,icons as i};
-use iced::{widget::{column,row,container,text,button,text_input,text_editor,pick_list,slider,scrollable,stack,Space,tooltip,svg},Length,Alignment,Color,Border};
-use openaec_ui::{design::{widgets as w,chrome as ch,focus,widgets::{ButtonKind as K,Density as D}},fonts};
-use paint_core::ribbon::{self,Density as Mode};
-const LABELS:[(&str,&str);6]=[("Bestand","File"),("Gereedschap","Tools"),("Eigenschappen","Properties"),("Kleuren","Colors"),("Afbeelding","Image"),("Beeld","View")];
-const GROUP_ICONS:[&str;6]=[i::OPEN,i::BRUSH,i::SETTINGS,i::COLOR,i::IMAGE,i::VIEW];
-const TOOLS:[(Tool,&str,&str,&str);10]=[(Tool::Brush,"Penseel","Brush",i::BRUSH),(Tool::Eraser,"Gum","Eraser",i::ERASER),(Tool::Fill,"Vullen","Fill",i::FILL),(Tool::Picker,"Pipet","Picker",i::PICKER),(Tool::Line,"Lijn","Line",i::LINE),(Tool::Rectangle,"Rechthoek","Rectangle",i::RECT),(Tool::Ellipse,"Ellips","Ellipse",i::ELLIPSE),(Tool::Text,"Tekst","Text",i::TEXT),(Tool::Select,"Selecteren","Select",i::SELECT),(Tool::Crop,"Bijsnijden","Crop",i::CROP)];
-const COLORS:[&str;30]=["#36363e","#ffffff","#d97706","#f59e0b","#dc2626","#2563eb","#0891b2","#16a34a","#9333ea","#a1a1aa","#e11d48","#ea580c","#4f46e5","#0d9488","#65a30d","#854d0e","#78716c","#e7e5e4","#fcd34d","#fed7aa","#fecaca","#fbcfe8","#e9d5ff","#c7d2fe","#bfdbfe","#a5f3fc","#99f6e4","#bbf7d0","#d9f99d","#d6d3d1"];
-fn action<'a>(app:&App,label:&'a str,icon:&'static str,command:Command)->Element<'a,Msg>{w::ribbon_small(app.look(),icon,label,false,Some(Msg::Command(command)))}
-fn simple<'a>(app:&App,label:&'a str,command:Command)->Element<'a,Msg>{w::button(app.look(),label,K::Secondary,D::Compact,None,Some(Msg::Command(command)))}
-pub fn view(app:&App)->Element<'_,Msg>{
- let look=app.look();let c=look.color;
- let mut title=row![svg(svg::Handle::from_memory(include_bytes!("../../../public/brand/openaec-symbol-transparent.svg") as &[u8])).width(24).height(24),text("OpenAEC").font(fonts::STRONG).size(16),text("Paint Studio").font(fonts::HEADING).size(14)].spacing(8).align_y(Alignment::Center);
- if app.width.width>=720.{title=title.push(ch::title_button(look,i::SAVE,false,"Opslaan · Ctrl+S",Some(Msg::Command(Command::Save)))).push(ch::title_button(look,i::UNDO,false,"Undo · Ctrl+Z",app.editor.can_undo().then_some(Msg::Command(Command::Undo)))).push(ch::title_button(look,i::REDO,false,"Redo · Ctrl+Shift+Z",app.editor.can_redo().then_some(Msg::Command(Command::Redo))));}
- title=title.push(Space::new().width(Length::Fill));if app.width.width>=900.{title=title.push(w::secondary(look,format!("{} · Rust",app.editor.document.name)));}title=title.push(w::secondary(look,VERSION)).push(ch::title_button(look,i::SETTINGS,false,"Instellingen",Some(Msg::Command(Command::Settings))));
- let title=container(title).padding([7,12]).height(42).style(move |_|container::Style{background:Some(c.frame.into()),text_color:Some(c.text),..Default::default()});
- let tabs=w::ribbon_tabs(look,app.tr("Bestand","File"),Some(Msg::Menu(Some(0))),&["Start"],0,|_|Msg::Menu(None));
- let docbar=container(row![w::glyph(i::IMAGE,16.,c.text,c.accent),w::body(look,format!("{}.ifcx{}",app.editor.document.name,if app.editor.dirty{"  •"}else{""})),Space::new().width(Length::Fill),w::secondary(look,app.tr("Lokale werkruimte","Local workspace"))].spacing(8).align_y(Alignment::Center)).padding([6,14]).style(move |_|container::Style{background:Some(c.panel.into()),..Default::default()});
- let board=iced::widget::canvas(crate::canvas::Board{app}).width(Length::Fill).height(Length::Fill);
- let mut work=row![board].height(Length::Fill);
- if app.inspector&&app.width.width>=1000.&&!app.focus{work=work.push(inspector(app));}
- let zoom=row![simple(app,"−",Command::Zoom(-10.)),slider(10. ..=400.,app.zoom,|v|Msg::Command(Command::Zoom(v-app.zoom))).width(100),w::body(look,format!("{:.0}%",app.zoom)),simple(app,"+",Command::Zoom(10.)),ch::title_button(look,i::FIT,false,"Passend maken",Some(Msg::Command(Command::Fit)))].spacing(5).align_y(Alignment::Center);
- let status=container(row![text(app.status.clone()).size(10).color(c.text_secondary).width(Length::Fill),text(format!("{} × {} px",app.editor.document.width,app.editor.document.height)).size(10),zoom].spacing(14).align_y(Alignment::Center)).padding([3,10]).height(34).style(move |_|container::Style{background:Some(c.statusbar.into()),..Default::default()});
- let mut screen=column![title];if !app.focus{screen=screen.push(tabs).push(ribbon(app)).push(docbar);}screen=screen.push(work).push(status);
- let mut layers:Vec<Element<'_,Msg>>=vec![focus::inert(container(screen).width(Length::Fill).height(Length::Fill).style(move |_|container::Style{background:Some(c.panel.into()),text_color:Some(c.text),..Default::default()}),app.dialog.is_some())];
- if let Some(group)=app.menu{layers.push(popup(app,group));}
- if app.text_box.is_some(){layers.push(text_box(app));}
- if let Some(d)=app.dialog{layers.push(dialog(app,d));}
- stack(layers).into()
+use crate::{icons as i, *};
+use iced::{
+    widget::{
+        button, column, container, pick_list, row, scrollable, slider, stack, svg, text,
+        text_editor, text_input, tooltip, Space,
+    },
+    Alignment, Border, Color, Length,
+};
+use openaec_ui::{
+    design::{
+        chrome as ch, focus, widgets as w,
+        widgets::{ButtonKind as K, Density as D},
+    },
+    fonts,
+};
+use paint_core::ribbon::{self, Density as Mode};
+const LABELS: [(&str, &str); 6] = [
+    ("Bestand", "File"),
+    ("Gereedschap", "Tools"),
+    ("Eigenschappen", "Properties"),
+    ("Kleuren", "Colors"),
+    ("Afbeelding", "Image"),
+    ("Beeld", "View"),
+];
+const GROUP_ICONS: [&str; 6] = [i::OPEN, i::BRUSH, i::SETTINGS, i::COLOR, i::IMAGE, i::VIEW];
+const TOOLS: [(Tool, &str, &str, &str); 10] = [
+    (Tool::Brush, "Penseel", "Brush", i::BRUSH),
+    (Tool::Eraser, "Gum", "Eraser", i::ERASER),
+    (Tool::Fill, "Vullen", "Fill", i::FILL),
+    (Tool::Picker, "Pipet", "Picker", i::PICKER),
+    (Tool::Line, "Lijn", "Line", i::LINE),
+    (Tool::Rectangle, "Rechthoek", "Rectangle", i::RECT),
+    (Tool::Ellipse, "Ellips", "Ellipse", i::ELLIPSE),
+    (Tool::Text, "Tekst", "Text", i::TEXT),
+    (Tool::Select, "Selecteren", "Select", i::SELECT),
+    (Tool::Crop, "Bijsnijden", "Crop", i::CROP),
+];
+const COLORS: [&str; 30] = [
+    "#36363e", "#ffffff", "#d97706", "#f59e0b", "#dc2626", "#2563eb", "#0891b2", "#16a34a",
+    "#9333ea", "#a1a1aa", "#e11d48", "#ea580c", "#4f46e5", "#0d9488", "#65a30d", "#854d0e",
+    "#78716c", "#e7e5e4", "#fcd34d", "#fed7aa", "#fecaca", "#fbcfe8", "#e9d5ff", "#c7d2fe",
+    "#bfdbfe", "#a5f3fc", "#99f6e4", "#bbf7d0", "#d9f99d", "#d6d3d1",
+];
+fn action<'a>(app: &App, label: &'a str, icon: &'static str, command: Command) -> Element<'a, Msg> {
+    w::ribbon_small(app.look(), icon, label, false, Some(Msg::Command(command)))
 }
-fn ribbon(app:&App)->Element<'_,Msg>{
- let look=app.look();let modes=ribbon::layout(app.width.width);let mut groups=row![].spacing(0).height(116);
- for (index,mode) in modes.iter().enumerate(){let spec=ribbon::GROUPS[index];let width=match mode{Mode::Expanded=>spec.expanded,Mode::Compact=>spec.compact,Mode::Collapsed=>spec.collapsed};let label=app.tr(LABELS[index].0,LABELS[index].1);
-  let body=if *mode==Mode::Collapsed{w::ribbon_large(look,GROUP_ICONS[index],label,false,Some(Msg::Menu(Some(index))))}else{group(app,index,*mode)};
-  let inner=column![container(body).height(84).center_x(Length::Fill),w::mono_label(look,if *mode==Mode::Collapsed{""}else{label})].spacing(3).align_x(Alignment::Center);
-  groups=groups.push(container(inner).width(width).height(116).padding([7,6]).style(move |_|container::Style{border:Border{color:look.color.border,width:0.5,..Default::default()},..Default::default()}));
- }
- container(groups).padding([0,8]).height(116).width(Length::Fill).style(move |_|container::Style{background:Some(look.color.panel.into()),..Default::default()}).into()
+fn simple<'a>(app: &App, label: &'a str, command: Command) -> Element<'a, Msg> {
+    w::button(
+        app.look(),
+        label,
+        K::Secondary,
+        D::Compact,
+        None,
+        Some(Msg::Command(command)),
+    )
 }
-fn group(app:&App,index:usize,mode:Mode)->Element<'_,Msg>{let compact=mode==Mode::Compact;match index{
- 0=>{let look=app.look();let first=row![tooltip(w::icon_button(look,i::OPEN,30.,false,"Openen",Some(Msg::Command(Command::Open))),w::body(look,app.tr("Openen","Open")),tooltip::Position::Bottom),tooltip(w::icon_button(look,i::SAVE,30.,false,"IFCX opslaan",Some(Msg::Command(Command::Save))),w::body(look,app.tr("IFCX opslaan","Save IFCX")),tooltip::Position::Bottom)].spacing(8);let second=row![tooltip(w::icon_button(look,i::NEW,30.,false,"Nieuw",Some(Msg::Command(Command::New))),w::body(look,app.tr("Nieuw canvas","New canvas")),tooltip::Position::Bottom),tooltip(w::icon_button(look,i::EXPORT,30.,false,"Exporteren",Some(Msg::Menu(Some(6)))),w::body(look,app.tr("Exporteren","Export")),tooltip::Position::Bottom)].spacing(8);column![first,second].spacing(5).into()},
- 1=>{let mut rows=column![].spacing(4);for chunk in TOOLS.chunks(5){let mut r=row![].spacing(if compact{2}else{8});for (tool,nl,en,icon) in chunk{let label=app.tr(nl,en);let control=w::icon_button(app.look(),icon,30.,app.tool==*tool,label,Some(Msg::Tool(*tool)));r=r.push(tooltip(control,w::body(app.look(),label),tooltip::Position::Bottom));}rows=rows.push(r);}rows=rows.push(w::checkbox(app.look(),app.tr("Vectoren behouden","Keep vectors"),app.editor.document.retain_vectors,Some(Msg::Vectors)));rows.into()},
- 2=>properties(app,compact),3=>palette(app,if compact{10}else{16}),
- 4=>{let a=action(app,app.tr(if compact{"Formaat"}else{"Formaat wijzigen"},"Resize"),i::IMAGE,Command::Resize);let b=action(app,app.tr("Draaien","Rotate"),i::ROTATE,Command::Transform(TransformAction::RotateRight));let crop=w::ribbon_small(app.look(),i::CROP,app.tr("Bijsnijden","Crop"),app.tool==Tool::Crop,Some(Msg::Tool(Tool::Crop)));let flip=action(app,app.tr("Spiegelen","Flip"),i::FLIP,Command::Transform(TransformAction::FlipHorizontal));let more=w::ribbon_small(app.look(),i::SETTINGS,app.tr("Bewerken…","Edit…"),false,Some(Msg::Menu(Some(4))));column![row![a,crop].spacing(4),row![b,flip].spacing(4),more].spacing(5).into()},
- _=>{if compact{let mut rows=column![].spacing(3);for chunk in [("Passend",i::FIT,Command::Fit),("100%",i::IMAGE,Command::Actual),("Raster",i::RECT,Command::Grid),("Focus",i::VIEW,Command::Focus),("Paneel",i::SETTINGS,Command::Inspector),("Instellingen",i::SETTINGS,Command::Settings)].chunks(2){let mut r=row![].spacing(8);for (label,icon,cmd) in chunk{r=r.push(tooltip(w::icon_button(app.look(),icon,24.,false,label,Some(Msg::Command(*cmd))),w::body(app.look(),*label),tooltip::Position::Bottom));}rows=rows.push(r);}rows.into()}else{column![row![action(app,app.tr("Passend","Fit"),i::FIT,Command::Fit),action(app,"100%",i::IMAGE,Command::Actual)],row![action(app,app.tr("Raster","Grid"),i::RECT,Command::Grid),action(app,"Focus",i::VIEW,Command::Focus)],action(app,app.tr("Instellingen","Settings"),i::SETTINGS,Command::Settings)].spacing(5).into()}},
-}}
-fn properties(app:&App,compact:bool)->Element<'_,Msg>{let look=app.look();let mut content=column![row![w::secondary(look,app.tr("Grootte","Size")),text_input("8",&app.size_text).on_input(Msg::Size).width(44).size(11).padding(3),w::secondary(look,"px")].spacing(5).align_y(Alignment::Center),row![w::secondary(look,app.tr("Dekking","Opacity")),slider(1. ..=100.,app.style.opacity*100.,Msg::Opacity).width(if compact{68}else{92}),w::secondary(look,format!("{:.0}%",app.style.opacity*100.))].spacing(5).align_y(Alignment::Center)].spacing(5);
- if app.tool==Tool::Text{let font=app.style.font_family.as_deref().unwrap_or("sans-serif");content=content.push(row![pick_list(["sans-serif","serif","monospace"],Some(font),|v|Msg::Font(v.into())).text_size(10).padding(3),w::checkbox(look,app.tr("Vet","Bold"),app.style.bold,Some(Msg::Bold))].spacing(5));}
- else if matches!(app.tool,Tool::Rectangle|Tool::Ellipse){content=content.push(w::checkbox(look,app.tr("Gevulde vorm","Filled shape"),app.style.filled,Some(Msg::Filled)));}
- else if app.tool==Tool::Select&&app.editor.selection.len()==1{content=content.push(action(app,app.tr("Object aanpassen","Apply to object"),i::CHECK,Command::ApplyStyle));}
- else{content=content.push(w::secondary(look,app.tr("Ctrl+A selecteert alles","Ctrl+A selects all")));}content.into()
+pub fn view(app: &App) -> Element<'_, Msg> {
+    let look = app.look();
+    let c = look.color;
+    let mut title = row![
+        svg(svg::Handle::from_memory(include_bytes!(
+            "../../../public/brand/openaec-symbol-transparent.svg"
+        ) as &[u8]))
+        .width(24)
+        .height(24),
+        text("OpenAEC").font(fonts::STRONG).size(16),
+        text("Paint Studio").font(fonts::HEADING).size(14)
+    ]
+    .spacing(8)
+    .align_y(Alignment::Center);
+    if app.width.width >= 720. {
+        title = title
+            .push(ch::title_button(
+                look,
+                i::SAVE,
+                false,
+                "Opslaan · Ctrl+S",
+                Some(Msg::Command(Command::Save)),
+            ))
+            .push(ch::title_button(
+                look,
+                i::UNDO,
+                false,
+                "Undo · Ctrl+Z",
+                app.editor.can_undo().then_some(Msg::Command(Command::Undo)),
+            ))
+            .push(ch::title_button(
+                look,
+                i::REDO,
+                false,
+                "Redo · Ctrl+Shift+Z",
+                app.editor.can_redo().then_some(Msg::Command(Command::Redo)),
+            ));
+    }
+    title = title.push(Space::new().width(Length::Fill));
+    if app.width.width >= 900. {
+        title = title.push(w::secondary(
+            look,
+            format!("{} · Rust", app.editor.document.name),
+        ));
+    }
+    title = title
+        .push(w::secondary(look, VERSION))
+        .push(ch::title_button(
+            look,
+            i::SETTINGS,
+            false,
+            "Instellingen",
+            Some(Msg::Command(Command::Settings)),
+        ));
+    let title = container(title)
+        .padding([7, 12])
+        .height(42)
+        .style(move |_| container::Style {
+            background: Some(c.frame.into()),
+            text_color: Some(c.text),
+            ..Default::default()
+        });
+    let tabs = w::ribbon_tabs(
+        look,
+        app.tr("Bestand", "File"),
+        Some(Msg::Menu(Some(0))),
+        &["Start"],
+        0,
+        |_| Msg::Menu(None),
+    );
+    let docbar = container(
+        row![
+            w::glyph(i::IMAGE, 16., c.text, c.accent),
+            w::body(
+                look,
+                format!(
+                    "{}.ifcx{}",
+                    app.editor.document.name,
+                    if app.editor.dirty { "  •" } else { "" }
+                )
+            ),
+            Space::new().width(Length::Fill),
+            w::secondary(look, app.tr("Lokale werkruimte", "Local workspace"))
+        ]
+        .spacing(8)
+        .align_y(Alignment::Center),
+    )
+    .padding([6, 14])
+    .style(move |_| container::Style {
+        background: Some(c.panel.into()),
+        ..Default::default()
+    });
+    let board = iced::widget::canvas(crate::canvas::Board { app })
+        .width(Length::Fill)
+        .height(Length::Fill);
+    let mut work = row![board].height(Length::Fill);
+    if app.inspector && app.width.width >= 1000. && !app.focus {
+        work = work.push(inspector(app));
+    }
+    let zoom = row![
+        simple(app, "−", Command::Zoom(-10.)),
+        slider(10. ..=400., app.zoom, |v| Msg::Command(Command::Zoom(
+            v - app.zoom
+        )))
+        .width(100),
+        w::body(look, format!("{:.0}%", app.zoom)),
+        simple(app, "+", Command::Zoom(10.)),
+        ch::title_button(
+            look,
+            i::FIT,
+            false,
+            "Passend maken",
+            Some(Msg::Command(Command::Fit))
+        )
+    ]
+    .spacing(5)
+    .align_y(Alignment::Center);
+    let status = container(
+        row![
+            text(app.status.clone())
+                .size(10)
+                .color(c.text_secondary)
+                .width(Length::Fill),
+            text(format!(
+                "{} × {} px",
+                app.editor.document.width, app.editor.document.height
+            ))
+            .size(10),
+            zoom
+        ]
+        .spacing(14)
+        .align_y(Alignment::Center),
+    )
+    .padding([3, 10])
+    .height(34)
+    .style(move |_| container::Style {
+        background: Some(c.statusbar.into()),
+        ..Default::default()
+    });
+    let mut screen = column![title];
+    if !app.focus {
+        screen = screen.push(tabs).push(ribbon(app)).push(docbar);
+    }
+    screen = screen.push(work).push(status);
+    let mut layers: Vec<Element<'_, Msg>> = vec![focus::inert(
+        container(screen)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(move |_| container::Style {
+                background: Some(c.panel.into()),
+                text_color: Some(c.text),
+                ..Default::default()
+            }),
+        app.dialog.is_some(),
+    )];
+    if let Some(group) = app.menu {
+        layers.push(popup(app, group));
+    }
+    if app.text_box.is_some() {
+        layers.push(text_box(app));
+    }
+    if let Some(d) = app.dialog {
+        layers.push(dialog(app, d));
+    }
+    stack(layers).into()
 }
-fn palette(app:&App,count:usize)->Element<'_,Msg>{let look=app.look();let size=if count>16{20.}else{16.};let per=if count>16{10}else{count.div_ceil(2)};let mut colors=column![].spacing(3);for chunk in COLORS[..count].chunks(per){let mut r=row![].spacing(3);for hex in chunk{let c=parse_color(hex).unwrap();let selected=app.style.color==*hex;let color=Color::from_rgb8(c[0],c[1],c[2]);let control=button(Space::new().width(size).height(size)).padding(0).on_press(Msg::Color((*hex).into())).style(move |_,_|button::Style{background:Some(color.into()),border:Border{color:if selected{look.color.accent}else{look.color.border},width:if selected{2.}else{0.5},radius:3.into()},..Default::default()});r=r.push(tooltip(control,w::body(look,*hex),tooltip::Position::Bottom));}colors=colors.push(r);}column![colors,text_input("#d97706",&app.color_text).on_input(Msg::Color).width(90).size(10).padding(3)].spacing(5).into()}
-fn inspector(app:&App)->Element<'_,Msg>{let look=app.look();let mut items=column![w::heading(look,app.tr("Eigenschappen","Properties"),16.),w::secondary(look,"Canvas"),w::body(look,format!("{} × {} px",app.editor.document.width,app.editor.document.height)),w::secondary(look,app.tr("Geschiedenis","History"))].spacing(14);if app.editor.document.operations.is_empty(){items=items.push(w::secondary(look,app.tr("Begin met tekenen","Start drawing")));}for (index,op) in app.editor.document.operations.iter().enumerate().rev().take(40){let label=match op.kind{Kind::Brush=>app.tr("Penseel","Brush"),Kind::Eraser=>app.tr("Gum","Eraser"),Kind::Fill=>app.tr("Vullen","Fill"),Kind::Line=>app.tr("Lijn","Line"),Kind::Rectangle=>app.tr("Rechthoek","Rectangle"),Kind::Ellipse=>app.tr("Ellips","Ellipse"),Kind::Text=>app.tr("Tekst","Text"),Kind::Image=>app.tr("Afbeelding","Image")};items=items.push(container(w::body(look,format!("{:02}  {label}",index+1))).padding([9,8]).width(Length::Fill));}items=items.push(w::secondary(look,"Rust · Blueprint UI 0.4"));container(scrollable(items)).width(230).height(Length::Fill).padding(18).style(move |_|container::Style{background:Some(look.color.panel.into()),border:Border{width:0.5,color:look.color.border,..Default::default()},..Default::default()}).into()}
-fn popup(app:&App,index:usize)->Element<'_,Msg>{let look=app.look();let title=if index==6{app.tr("Exporteren","Export")}else{app.tr(LABELS[index].0,LABELS[index].1)};let mut content=column![row![w::heading(look,title,15.).width(Length::Fill),w::icon_button(look,i::CLOSE,24.,false,"Sluiten",Some(Msg::Menu(None)))]].spacing(8);
- match index{
-  0=>{for (nl,en,icon,cmd) in [("Open afbeelding","Open image",i::OPEN,Command::Open),("IFCX openen","Open IFCX",i::OPEN,Command::OpenIfcx),("Nieuw canvas","New canvas",i::NEW,Command::New),("IFCX opslaan","Save IFCX",i::SAVE,Command::Save)]{content=content.push(action(app,app.tr(nl,en),icon,cmd));}for ext in ["png","jpeg","webp","svg","ifcx","ifcxb"]{content=content.push(simple(app,ext,Command::Export(ext)));}},
-  1=>{for (tool,nl,en,icon) in TOOLS{content=content.push(w::ribbon_small(look,icon,app.tr(nl,en),app.tool==tool,Some(Msg::Tool(tool))));}content=content.push(w::checkbox(look,app.tr("Vectoren behouden","Keep vectors"),app.editor.document.retain_vectors,Some(Msg::Vectors)));},
-  2=>{content=content.push(properties(app,false));if app.editor.selection.len()==1{let op=&app.editor.document.operations[app.editor.selection[0]];if op.kind==Kind::Text{content=content.push(pick_list(["sans-serif","serif","monospace"],Some(app.style.font_family.as_deref().unwrap_or("sans-serif")),|v|Msg::Font(v.into()))).push(w::checkbox(look,app.tr("Vet","Bold"),app.style.bold,Some(Msg::Bold)));}if matches!(op.kind,Kind::Rectangle|Kind::Ellipse){content=content.push(w::checkbox(look,app.tr("Gevulde vorm","Filled shape"),app.style.filled,Some(Msg::Filled)));}}if app.tool==Tool::Select{content=content.push(simple(app,app.tr("Alles selecteren","Select all"),Command::SelectAll)).push(simple(app,app.tr("Selectie verwijderen","Delete selection"),Command::Delete));}},
-  3=>content=content.push(palette(app,30)),
-  4=>{for (nl,en,icon,cmd) in [("Formaat wijzigen","Resize",i::IMAGE,Command::Resize),("90° rechts draaien","Rotate right",i::ROTATE,Command::Transform(TransformAction::RotateRight)),("90° links draaien","Rotate left",i::ROTATE,Command::Transform(TransformAction::RotateLeft)),("Horizontaal spiegelen","Flip horizontal",i::FLIP,Command::Transform(TransformAction::FlipHorizontal)),("Verticaal spiegelen","Flip vertical",i::FLIP,Command::Transform(TransformAction::FlipVertical)),("Kleurcorrecties","Color adjustments",i::SETTINGS,Command::Adjust),("Grijswaarden","Grayscale",i::COLOR,Command::Filter(Filter::Grayscale)),("Kleuren omkeren","Invert",i::COLOR,Command::Filter(Filter::Invert)),("Sepia","Sepia",i::COLOR,Command::Filter(Filter::Sepia))]{content=content.push(action(app,app.tr(nl,en),icon,cmd));}content=content.push(w::ribbon_small(look,i::CROP,app.tr("Bijsnijden","Crop"),false,Some(Msg::Tool(Tool::Crop))));},
-  5=>{for(nl,en,icon,cmd)in[("Passend maken","Fit",i::FIT,Command::Fit),("100% ware grootte","100% actual size",i::IMAGE,Command::Actual),("Raster aan/uit","Toggle grid",i::RECT,Command::Grid),("Focusmodus","Focus mode",i::VIEW,Command::Focus),("Eigenschappenpaneel","Properties panel",i::SETTINGS,Command::Inspector),("Instellingen","Settings",i::SETTINGS,Command::Settings),("API / MCP","API / MCP",i::SETTINGS,Command::Api)]{content=content.push(action(app,app.tr(nl,en),icon,cmd));}},
-  6=>{for ext in ["png","jpeg","webp","svg","ifcx","ifcxb"]{content=content.push(simple(app,ext,Command::Export(ext)));}},_=>{}
- }
- let height=if index==0{390.}else if matches!(index,1|4){370.}else{290.};let width=300.;let panel=container(scrollable(content).height(height)).width(width).padding(12).style(move |_|w::surface(look,look.tokens.shadow.popup,8.));let modes=ribbon::layout(app.width.width);let x=if index<6{8.+ribbon::width(&modes[..index])-24.}else{8.};ch::menu_layer(panel.into(),Point::new(x,190.),Size::new(width,height+24.),app.width,Msg::Menu(None))
+fn ribbon(app: &App) -> Element<'_, Msg> {
+    let look = app.look();
+    let modes = ribbon::layout(app.width.width);
+    let mut groups = row![].spacing(0).height(116);
+    for (index, mode) in modes.iter().enumerate() {
+        let spec = ribbon::GROUPS[index];
+        let width = match mode {
+            Mode::Expanded => spec.expanded,
+            Mode::Compact => spec.compact,
+            Mode::Collapsed => spec.collapsed,
+        };
+        let label = app.tr(LABELS[index].0, LABELS[index].1);
+        let body = if *mode == Mode::Collapsed {
+            w::ribbon_large(
+                look,
+                GROUP_ICONS[index],
+                label,
+                false,
+                Some(Msg::Menu(Some(index))),
+            )
+        } else {
+            group(app, index, *mode)
+        };
+        let inner = column![
+            container(body).height(84).center_x(Length::Fill),
+            w::mono_label(look, if *mode == Mode::Collapsed { "" } else { label })
+        ]
+        .spacing(3)
+        .align_x(Alignment::Center);
+        groups = groups.push(
+            container(inner)
+                .width(width)
+                .height(116)
+                .padding([7, 6])
+                .style(move |_| container::Style {
+                    border: Border {
+                        color: look.color.border,
+                        width: 0.5,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }),
+        );
+    }
+    container(groups)
+        .padding([0, 8])
+        .height(116)
+        .width(Length::Fill)
+        .style(move |_| container::Style {
+            background: Some(look.color.panel.into()),
+            ..Default::default()
+        })
+        .into()
 }
-fn text_box(app:&App)->Element<'_,Msg>{let draft=app.text_box.as_ref().unwrap();let look=app.look();let contents=column![w::heading(look,app.tr("Tekst bewerken","Edit text"),14.),text_editor(&draft.content).on_action(Msg::Text).height(100).padding(8).font(fonts::BODY).size(app.style.size.clamp(14.,40.)),row![pick_list(["sans-serif","serif","monospace"],Some(app.style.font_family.as_deref().unwrap_or("sans-serif")),|v|Msg::Font(v.into())).text_size(11),w::checkbox(look,app.tr("Vet","Bold"),app.style.bold,Some(Msg::Bold))].spacing(8),row![simple(app,app.tr("Toepassen","Apply"),Command::ApplyText),simple(app,app.tr("Annuleren","Cancel"),Command::Cancel)].spacing(8)].spacing(8);let card=container(contents).padding(12).width(350).style(move |_|w::surface(look,look.tokens.shadow.popup,8.));let origin=app.origin(app.canvas_size);let top=if app.focus{42.}else{42.+28.+116.+30.};let at=Point::new(origin.x+draft.at.x*app.zoom/100.,top+origin.y+draft.at.y*app.zoom/100.);ch::menu_layer(card.into(),at,Size::new(350.,230.),app.width,Msg::Menu(None))}
-fn dialog(app:&App,which:Dialog)->Element<'_,Msg>{let look=app.look();let mut actions=vec![w::button(look,app.tr("Annuleren","Cancel"),K::Secondary,D::Regular,None,Some(Msg::Dialog(None)))];let (title,content):(&str,Element<'_,Msg>)=match which{
- Dialog::Settings=>{let content=column![w::secondary(look,app.tr("Thema","Theme")),pick_list(ThemeId::ALL,Some(app.settings.theme),Msg::Theme),w::checkbox(look,"English",app.settings.english,Some(Msg::English)),w::heading(look,app.tr("Sneltoetsen","Shortcuts"),14.),w::body(look,"Ctrl+A · Select all    Ctrl+S · Save IFCX"),w::body(look,"Ctrl+Z · Undo    Ctrl+Shift+Z · Redo"),w::body(look,"Ctrl+wheel · Zoom    Middle drag · Pan"),w::body(look,"Escape · Select    Delete · Remove objects"),w::secondary(look,format!("OpenAEC Paint Studio {VERSION} · Rust"))].spacing(12);(app.tr("Instellingen","Settings"),content.into())},
- Dialog::New|Dialog::Resize=>{let mut content=column![row![w::body(look,app.tr("Breedte","Width")),text_input("1200",&app.width_text).on_input(Msg::Width).width(90),w::body(look,"px")].spacing(8).align_y(Alignment::Center),row![w::body(look,app.tr("Hoogte","Height")),text_input("800",&app.height_text).on_input(Msg::Height).width(90),w::body(look,"px")].spacing(8).align_y(Alignment::Center),w::secondary(look,app.tr("Maximaal 4096 px per zijde · 8 megapixels","Up to 4096 px per side · 8 megapixels"))].spacing(12);if which==Dialog::New{content=content.push(text_input("Naam",&app.name_text).on_input(Msg::Name));}actions.push(w::button(look,app.tr("Toepassen","Apply"),K::Primary,D::Regular,None,Some(Msg::Apply)));(if which==Dialog::New{app.tr("Nieuw canvas","New canvas")}else{app.tr("Formaat wijzigen","Resize")},content.into())},
- Dialog::Adjust=>{let mut content=column![].spacing(14);for (index,(nl,en,range)) in [("Helderheid","Brightness",-100. ..=100.),("Contrast","Contrast",-100. ..=100.),("Verzadiging","Saturation",0. ..=200.)].into_iter().enumerate(){content=content.push(w::body(look,app.tr(nl,en))).push(slider(range,app.corrections[index],move|v|Msg::Correction(index as u8,v)));}actions.push(w::button(look,app.tr("Toepassen","Apply"),K::Primary,D::Regular,None,Some(Msg::Apply)));(app.tr("Kleurcorrecties","Color adjustments"),content.into())},
- Dialog::Api=>{let mut content=column![w::secondary(look,"REST API · 127.0.0.1:47831 · MCP stdio"),text_input("http://127.0.0.1:47831",&app.api_base).on_input(Msg::ApiBase),text_input("Bearer token",&app.api_token).on_input(Msg::ApiToken).secure(true),text_input("Document UUID",&app.api_id).on_input(Msg::ApiId),row![w::button(look,"Lijst",K::Secondary,D::Regular,None,Some(Msg::ApiAction("list"))),w::button(look,"Upload",K::Secondary,D::Regular,None,Some(Msg::ApiAction("push"))),w::button(look,"Download",K::Secondary,D::Regular,None,Some(Msg::ApiAction("pull")))].spacing(8)].spacing(10);for d in app.api_documents.iter().take(5){let id=d["id"].as_str().unwrap_or("").to_owned();content=content.push(button(text(d["name"].as_str().unwrap_or("Document")).size(12)).on_press(Msg::ApiId(id)));}("API / MCP",content.into())},
- Dialog::Close=>{actions.push(w::button(look,app.tr("Sluiten","Close"),K::Secondary,D::Regular,None,Some(Msg::Exit)));actions.push(w::button(look,app.tr("Opslaan en sluiten","Save and close"),K::Primary,D::Regular,None,Some(Msg::Command(Command::Save))));(app.tr("Wijzigingen opslaan?","Save changes?"),w::body(look,app.tr("Het lokale concept is bewaard. Sla ook een IFCX-bestand op om het te delen.","Your local draft is kept. Save an IFCX file to share the image.")).into())},
- Dialog::Replace=>{actions.push(w::button(look,app.tr("Vervangen","Replace"),K::Primary,D::Regular,None,Some(Msg::Replace)));(app.tr("Afbeelding vervangen?","Replace image?"),w::body(look,app.tr("De huidige afbeelding heeft wijzigingen. Wil je de nieuwe afbeelding openen?","The current image has changes. Open the new image?")).into())},
- };let body=column![content,w::secondary(look,&app.status)].spacing(10).into();w::overlay(look,w::dialog(look,title,i::CLOSE,Some(Msg::Dialog(None)),body,None,actions,false))
+fn group(app: &App, index: usize, mode: Mode) -> Element<'_, Msg> {
+    let compact = mode == Mode::Compact;
+    match index {
+        0 => {
+            let look = app.look();
+            let first = row![
+                tooltip(
+                    w::icon_button(
+                        look,
+                        i::OPEN,
+                        30.,
+                        false,
+                        "Openen",
+                        Some(Msg::Command(Command::Open))
+                    ),
+                    w::body(look, app.tr("Openen", "Open")),
+                    tooltip::Position::Bottom
+                ),
+                tooltip(
+                    w::icon_button(
+                        look,
+                        i::SAVE,
+                        30.,
+                        false,
+                        "IFCX opslaan",
+                        Some(Msg::Command(Command::Save))
+                    ),
+                    w::body(look, app.tr("IFCX opslaan", "Save IFCX")),
+                    tooltip::Position::Bottom
+                )
+            ]
+            .spacing(8);
+            let second = row![
+                tooltip(
+                    w::icon_button(
+                        look,
+                        i::NEW,
+                        30.,
+                        false,
+                        "Nieuw",
+                        Some(Msg::Command(Command::New))
+                    ),
+                    w::body(look, app.tr("Nieuw canvas", "New canvas")),
+                    tooltip::Position::Bottom
+                ),
+                tooltip(
+                    w::icon_button(
+                        look,
+                        i::EXPORT,
+                        30.,
+                        false,
+                        "Exporteren",
+                        Some(Msg::Menu(Some(6)))
+                    ),
+                    w::body(look, app.tr("Exporteren", "Export")),
+                    tooltip::Position::Bottom
+                )
+            ]
+            .spacing(8);
+            column![first, second].spacing(5).into()
+        }
+        1 => {
+            let mut rows = column![].spacing(4);
+            for chunk in TOOLS.chunks(5) {
+                let mut r = row![].spacing(if compact { 2 } else { 8 });
+                for (tool, nl, en, icon) in chunk {
+                    let label = app.tr(nl, en);
+                    let control = w::icon_button(
+                        app.look(),
+                        icon,
+                        30.,
+                        app.tool == *tool,
+                        label,
+                        Some(Msg::Tool(*tool)),
+                    );
+                    r = r.push(tooltip(
+                        control,
+                        w::body(app.look(), label),
+                        tooltip::Position::Bottom,
+                    ));
+                }
+                rows = rows.push(r);
+            }
+            rows = rows.push(w::checkbox(
+                app.look(),
+                app.tr("Vectoren behouden", "Keep vectors"),
+                app.editor.document.retain_vectors,
+                Some(Msg::Vectors),
+            ));
+            rows.into()
+        }
+        2 => properties(app, compact),
+        3 => palette(app, if compact { 10 } else { 16 }),
+        4 => {
+            let a = action(
+                app,
+                app.tr(
+                    if compact {
+                        "Formaat"
+                    } else {
+                        "Formaat wijzigen"
+                    },
+                    "Resize",
+                ),
+                i::IMAGE,
+                Command::Resize,
+            );
+            let b = action(
+                app,
+                app.tr("Draaien", "Rotate"),
+                i::ROTATE,
+                Command::Transform(TransformAction::RotateRight),
+            );
+            let crop = w::ribbon_small(
+                app.look(),
+                i::CROP,
+                app.tr("Bijsnijden", "Crop"),
+                app.tool == Tool::Crop,
+                Some(Msg::Tool(Tool::Crop)),
+            );
+            let flip = action(
+                app,
+                app.tr("Spiegelen", "Flip"),
+                i::FLIP,
+                Command::Transform(TransformAction::FlipHorizontal),
+            );
+            let more = w::ribbon_small(
+                app.look(),
+                i::SETTINGS,
+                app.tr("Bewerken…", "Edit…"),
+                false,
+                Some(Msg::Menu(Some(4))),
+            );
+            column![row![a, crop].spacing(4), row![b, flip].spacing(4), more]
+                .spacing(5)
+                .into()
+        }
+        _ => {
+            if compact {
+                let mut rows = column![].spacing(3);
+                for chunk in [
+                    ("Passend", i::FIT, Command::Fit),
+                    ("100%", i::IMAGE, Command::Actual),
+                    ("Raster", i::RECT, Command::Grid),
+                    ("Focus", i::VIEW, Command::Focus),
+                    ("Paneel", i::SETTINGS, Command::Inspector),
+                    ("Instellingen", i::SETTINGS, Command::Settings),
+                ]
+                .chunks(2)
+                {
+                    let mut r = row![].spacing(8);
+                    for (label, icon, cmd) in chunk {
+                        r = r.push(tooltip(
+                            w::icon_button(
+                                app.look(),
+                                icon,
+                                24.,
+                                false,
+                                label,
+                                Some(Msg::Command(*cmd)),
+                            ),
+                            w::body(app.look(), *label),
+                            tooltip::Position::Bottom,
+                        ));
+                    }
+                    rows = rows.push(r);
+                }
+                rows.into()
+            } else {
+                column![
+                    row![
+                        action(app, app.tr("Passend", "Fit"), i::FIT, Command::Fit),
+                        action(app, "100%", i::IMAGE, Command::Actual)
+                    ],
+                    row![
+                        action(app, app.tr("Raster", "Grid"), i::RECT, Command::Grid),
+                        action(app, "Focus", i::VIEW, Command::Focus)
+                    ],
+                    action(
+                        app,
+                        app.tr("Instellingen", "Settings"),
+                        i::SETTINGS,
+                        Command::Settings
+                    )
+                ]
+                .spacing(5)
+                .into()
+            }
+        }
+    }
+}
+fn properties(app: &App, compact: bool) -> Element<'_, Msg> {
+    let look = app.look();
+    let mut content = column![
+        row![
+            w::secondary(look, app.tr("Grootte", "Size")),
+            text_input("8", &app.size_text)
+                .on_input(Msg::Size)
+                .width(44)
+                .size(11)
+                .padding(3),
+            w::secondary(look, "px")
+        ]
+        .spacing(5)
+        .align_y(Alignment::Center),
+        row![
+            w::secondary(look, app.tr("Dekking", "Opacity")),
+            slider(1. ..=100., app.style.opacity * 100., Msg::Opacity).width(if compact {
+                68
+            } else {
+                92
+            }),
+            w::secondary(look, format!("{:.0}%", app.style.opacity * 100.))
+        ]
+        .spacing(5)
+        .align_y(Alignment::Center)
+    ]
+    .spacing(5);
+    if app.tool == Tool::Text {
+        let font = app.style.font_family.as_deref().unwrap_or("sans-serif");
+        content = content.push(
+            row![
+                pick_list(["sans-serif", "serif", "monospace"], Some(font), |v| {
+                    Msg::Font(v.into())
+                })
+                .text_size(10)
+                .padding(3),
+                w::checkbox(look, app.tr("Vet", "Bold"), app.style.bold, Some(Msg::Bold))
+            ]
+            .spacing(5),
+        );
+    } else if matches!(app.tool, Tool::Rectangle | Tool::Ellipse) {
+        content = content.push(w::checkbox(
+            look,
+            app.tr("Gevulde vorm", "Filled shape"),
+            app.style.filled,
+            Some(Msg::Filled),
+        ));
+    } else if app.tool == Tool::Select && app.editor.selection.len() == 1 {
+        content = content.push(action(
+            app,
+            app.tr("Object aanpassen", "Apply to object"),
+            i::CHECK,
+            Command::ApplyStyle,
+        ));
+    } else {
+        content = content.push(w::secondary(
+            look,
+            app.tr("Ctrl+A selecteert alles", "Ctrl+A selects all"),
+        ));
+    }
+    content.into()
+}
+fn palette(app: &App, count: usize) -> Element<'_, Msg> {
+    let look = app.look();
+    let size = if count > 16 { 20. } else { 16. };
+    let per = if count > 16 { 10 } else { count.div_ceil(2) };
+    let mut colors = column![].spacing(3);
+    for chunk in COLORS[..count].chunks(per) {
+        let mut r = row![].spacing(3);
+        for hex in chunk {
+            let c = parse_color(hex).unwrap();
+            let selected = app.style.color == *hex;
+            let color = Color::from_rgb8(c[0], c[1], c[2]);
+            let control = button(Space::new().width(size).height(size))
+                .padding(0)
+                .on_press(Msg::Color((*hex).into()))
+                .style(move |_, _| button::Style {
+                    background: Some(color.into()),
+                    border: Border {
+                        color: if selected {
+                            look.color.accent
+                        } else {
+                            look.color.border
+                        },
+                        width: if selected { 2. } else { 0.5 },
+                        radius: 3.into(),
+                    },
+                    ..Default::default()
+                });
+            r = r.push(tooltip(
+                control,
+                w::body(look, *hex),
+                tooltip::Position::Bottom,
+            ));
+        }
+        colors = colors.push(r);
+    }
+    column![
+        colors,
+        text_input("#d97706", &app.color_text)
+            .on_input(Msg::Color)
+            .width(90)
+            .size(10)
+            .padding(3)
+    ]
+    .spacing(5)
+    .into()
+}
+fn inspector(app: &App) -> Element<'_, Msg> {
+    let look = app.look();
+    let mut items = column![
+        w::heading(look, app.tr("Eigenschappen", "Properties"), 16.),
+        w::secondary(look, "Canvas"),
+        w::body(
+            look,
+            format!(
+                "{} × {} px",
+                app.editor.document.width, app.editor.document.height
+            )
+        ),
+        w::secondary(look, app.tr("Geschiedenis", "History"))
+    ]
+    .spacing(14);
+    if app.editor.document.operations.is_empty() {
+        items = items.push(w::secondary(
+            look,
+            app.tr("Begin met tekenen", "Start drawing"),
+        ));
+    }
+    for (index, op) in app
+        .editor
+        .document
+        .operations
+        .iter()
+        .enumerate()
+        .rev()
+        .take(40)
+    {
+        let label = match op.kind {
+            Kind::Brush => app.tr("Penseel", "Brush"),
+            Kind::Eraser => app.tr("Gum", "Eraser"),
+            Kind::Fill => app.tr("Vullen", "Fill"),
+            Kind::Line => app.tr("Lijn", "Line"),
+            Kind::Rectangle => app.tr("Rechthoek", "Rectangle"),
+            Kind::Ellipse => app.tr("Ellips", "Ellipse"),
+            Kind::Text => app.tr("Tekst", "Text"),
+            Kind::Image => app.tr("Afbeelding", "Image"),
+        };
+        items = items.push(
+            container(w::body(look, format!("{:02}  {label}", index + 1)))
+                .padding([9, 8])
+                .width(Length::Fill),
+        );
+    }
+    items = items.push(w::secondary(look, "Rust · Blueprint UI 0.4"));
+    container(scrollable(items))
+        .width(230)
+        .height(Length::Fill)
+        .padding(18)
+        .style(move |_| container::Style {
+            background: Some(look.color.panel.into()),
+            border: Border {
+                width: 0.5,
+                color: look.color.border,
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .into()
+}
+fn popup(app: &App, index: usize) -> Element<'_, Msg> {
+    let look = app.look();
+    let title = if index == 6 {
+        app.tr("Exporteren", "Export")
+    } else {
+        app.tr(LABELS[index].0, LABELS[index].1)
+    };
+    let mut content = column![row![
+        w::heading(look, title, 15.).width(Length::Fill),
+        w::icon_button(look, i::CLOSE, 24., false, "Sluiten", Some(Msg::Menu(None)))
+    ]]
+    .spacing(8);
+    match index {
+        0 => {
+            for (nl, en, icon, cmd) in [
+                ("Open afbeelding", "Open image", i::OPEN, Command::Open),
+                ("IFCX openen", "Open IFCX", i::OPEN, Command::OpenIfcx),
+                ("Nieuw canvas", "New canvas", i::NEW, Command::New),
+                ("IFCX opslaan", "Save IFCX", i::SAVE, Command::Save),
+            ] {
+                content = content.push(action(app, app.tr(nl, en), icon, cmd));
+            }
+            for ext in ["png", "jpeg", "webp", "svg", "ifcx", "ifcxb"] {
+                content = content.push(simple(app, ext, Command::Export(ext)));
+            }
+        }
+        1 => {
+            for (tool, nl, en, icon) in TOOLS {
+                content = content.push(w::ribbon_small(
+                    look,
+                    icon,
+                    app.tr(nl, en),
+                    app.tool == tool,
+                    Some(Msg::Tool(tool)),
+                ));
+            }
+            content = content.push(w::checkbox(
+                look,
+                app.tr("Vectoren behouden", "Keep vectors"),
+                app.editor.document.retain_vectors,
+                Some(Msg::Vectors),
+            ));
+        }
+        2 => {
+            content = content.push(properties(app, false));
+            if app.editor.selection.len() == 1 {
+                let op = &app.editor.document.operations[app.editor.selection[0]];
+                if op.kind == Kind::Text {
+                    content = content
+                        .push(pick_list(
+                            ["sans-serif", "serif", "monospace"],
+                            Some(app.style.font_family.as_deref().unwrap_or("sans-serif")),
+                            |v| Msg::Font(v.into()),
+                        ))
+                        .push(w::checkbox(
+                            look,
+                            app.tr("Vet", "Bold"),
+                            app.style.bold,
+                            Some(Msg::Bold),
+                        ));
+                }
+                if matches!(op.kind, Kind::Rectangle | Kind::Ellipse) {
+                    content = content.push(w::checkbox(
+                        look,
+                        app.tr("Gevulde vorm", "Filled shape"),
+                        app.style.filled,
+                        Some(Msg::Filled),
+                    ));
+                }
+            }
+            if app.tool == Tool::Select {
+                content = content
+                    .push(simple(
+                        app,
+                        app.tr("Alles selecteren", "Select all"),
+                        Command::SelectAll,
+                    ))
+                    .push(simple(
+                        app,
+                        app.tr("Selectie verwijderen", "Delete selection"),
+                        Command::Delete,
+                    ));
+            }
+        }
+        3 => content = content.push(palette(app, 30)),
+        4 => {
+            for (nl, en, icon, cmd) in [
+                ("Formaat wijzigen", "Resize", i::IMAGE, Command::Resize),
+                (
+                    "90° rechts draaien",
+                    "Rotate right",
+                    i::ROTATE,
+                    Command::Transform(TransformAction::RotateRight),
+                ),
+                (
+                    "90° links draaien",
+                    "Rotate left",
+                    i::ROTATE,
+                    Command::Transform(TransformAction::RotateLeft),
+                ),
+                (
+                    "Horizontaal spiegelen",
+                    "Flip horizontal",
+                    i::FLIP,
+                    Command::Transform(TransformAction::FlipHorizontal),
+                ),
+                (
+                    "Verticaal spiegelen",
+                    "Flip vertical",
+                    i::FLIP,
+                    Command::Transform(TransformAction::FlipVertical),
+                ),
+                (
+                    "Kleurcorrecties",
+                    "Color adjustments",
+                    i::SETTINGS,
+                    Command::Adjust,
+                ),
+                (
+                    "Grijswaarden",
+                    "Grayscale",
+                    i::COLOR,
+                    Command::Filter(Filter::Grayscale),
+                ),
+                (
+                    "Kleuren omkeren",
+                    "Invert",
+                    i::COLOR,
+                    Command::Filter(Filter::Invert),
+                ),
+                ("Sepia", "Sepia", i::COLOR, Command::Filter(Filter::Sepia)),
+            ] {
+                content = content.push(action(app, app.tr(nl, en), icon, cmd));
+            }
+            content = content.push(w::ribbon_small(
+                look,
+                i::CROP,
+                app.tr("Bijsnijden", "Crop"),
+                false,
+                Some(Msg::Tool(Tool::Crop)),
+            ));
+        }
+        5 => {
+            for (nl, en, icon, cmd) in [
+                ("Passend maken", "Fit", i::FIT, Command::Fit),
+                (
+                    "100% ware grootte",
+                    "100% actual size",
+                    i::IMAGE,
+                    Command::Actual,
+                ),
+                ("Raster aan/uit", "Toggle grid", i::RECT, Command::Grid),
+                ("Focusmodus", "Focus mode", i::VIEW, Command::Focus),
+                (
+                    "Eigenschappenpaneel",
+                    "Properties panel",
+                    i::SETTINGS,
+                    Command::Inspector,
+                ),
+                ("Instellingen", "Settings", i::SETTINGS, Command::Settings),
+                ("API / MCP", "API / MCP", i::SETTINGS, Command::Api),
+            ] {
+                content = content.push(action(app, app.tr(nl, en), icon, cmd));
+            }
+        }
+        6 => {
+            for ext in ["png", "jpeg", "webp", "svg", "ifcx", "ifcxb"] {
+                content = content.push(simple(app, ext, Command::Export(ext)));
+            }
+        }
+        _ => {}
+    }
+    let height = if index == 0 {
+        390.
+    } else if matches!(index, 1 | 4) {
+        370.
+    } else {
+        290.
+    };
+    let width = 300.;
+    let panel = container(scrollable(content).height(height))
+        .width(width)
+        .padding(12)
+        .style(move |_| w::surface(look, look.tokens.shadow.popup, 8.));
+    let modes = ribbon::layout(app.width.width);
+    let x = if index < 6 {
+        8. + ribbon::width(&modes[..index]) - 24.
+    } else {
+        8.
+    };
+    ch::menu_layer(
+        panel.into(),
+        Point::new(x, 190.),
+        Size::new(width, height + 24.),
+        app.width,
+        Msg::Menu(None),
+    )
+}
+fn text_box(app: &App) -> Element<'_, Msg> {
+    let draft = app.text_box.as_ref().unwrap();
+    let look = app.look();
+    let contents = column![
+        w::heading(look, app.tr("Tekst bewerken", "Edit text"), 14.),
+        text_editor(&draft.content)
+            .id("paint-text")
+            .on_action(Msg::Text)
+            .height(100)
+            .padding(8)
+            .font(fonts::BODY)
+            .size(app.style.size.clamp(14., 40.)),
+        row![
+            pick_list(
+                ["sans-serif", "serif", "monospace"],
+                Some(app.style.font_family.as_deref().unwrap_or("sans-serif")),
+                |v| Msg::Font(v.into())
+            )
+            .text_size(11),
+            w::checkbox(look, app.tr("Vet", "Bold"), app.style.bold, Some(Msg::Bold))
+        ]
+        .spacing(8),
+        row![
+            simple(app, app.tr("Toepassen", "Apply"), Command::ApplyText),
+            simple(app, app.tr("Annuleren", "Cancel"), Command::Cancel)
+        ]
+        .spacing(8)
+    ]
+    .spacing(8);
+    let card = container(contents)
+        .padding(12)
+        .width(350)
+        .style(move |_| w::surface(look, look.tokens.shadow.popup, 8.));
+    let origin = app.origin(app.canvas_size);
+    let top = if app.focus {
+        42.
+    } else {
+        42. + 28. + 116. + 30.
+    };
+    let at = Point::new(
+        origin.x + draft.at.x * app.zoom / 100.,
+        top + origin.y + draft.at.y * app.zoom / 100.,
+    );
+    ch::menu_layer(
+        card.into(),
+        at,
+        Size::new(350., 230.),
+        app.width,
+        Msg::Menu(None),
+    )
+}
+fn dialog(app: &App, which: Dialog) -> Element<'_, Msg> {
+    let look = app.look();
+    let mut actions = vec![w::button(
+        look,
+        app.tr("Annuleren", "Cancel"),
+        K::Secondary,
+        D::Regular,
+        None,
+        Some(Msg::Dialog(None)),
+    )];
+    let (title, content): (&str, Element<'_, Msg>) = match which {
+        Dialog::Settings => {
+            let content = column![
+                w::secondary(look, app.tr("Thema", "Theme")),
+                pick_list(ThemeId::ALL, Some(app.settings.theme), Msg::Theme),
+                w::checkbox(look, "English", app.settings.english, Some(Msg::English)),
+                w::heading(look, app.tr("Sneltoetsen", "Shortcuts"), 14.),
+                w::body(look, "Ctrl+A · Select all    Ctrl+S · Save IFCX"),
+                w::body(look, "Ctrl+Z · Undo    Ctrl+Shift+Z · Redo"),
+                w::body(look, "Ctrl+wheel · Zoom    Middle drag · Pan"),
+                w::body(look, "Escape · Select    Delete · Remove objects"),
+                w::secondary(look, format!("OpenAEC Paint Studio {VERSION} · Rust"))
+            ]
+            .spacing(12);
+            (app.tr("Instellingen", "Settings"), content.into())
+        }
+        Dialog::New | Dialog::Resize => {
+            let mut content = column![
+                row![
+                    w::body(look, app.tr("Breedte", "Width")),
+                    text_input("1200", &app.width_text)
+                        .on_input(Msg::Width)
+                        .width(90),
+                    w::body(look, "px")
+                ]
+                .spacing(8)
+                .align_y(Alignment::Center),
+                row![
+                    w::body(look, app.tr("Hoogte", "Height")),
+                    text_input("800", &app.height_text)
+                        .on_input(Msg::Height)
+                        .width(90),
+                    w::body(look, "px")
+                ]
+                .spacing(8)
+                .align_y(Alignment::Center),
+                w::secondary(
+                    look,
+                    app.tr(
+                        "Maximaal 4096 px per zijde · 8 megapixels",
+                        "Up to 4096 px per side · 8 megapixels"
+                    )
+                )
+            ]
+            .spacing(12);
+            if which == Dialog::New {
+                content = content.push(text_input("Naam", &app.name_text).on_input(Msg::Name));
+            }
+            actions.push(w::button(
+                look,
+                app.tr("Toepassen", "Apply"),
+                K::Primary,
+                D::Regular,
+                None,
+                Some(Msg::Apply),
+            ));
+            (
+                if which == Dialog::New {
+                    app.tr("Nieuw canvas", "New canvas")
+                } else {
+                    app.tr("Formaat wijzigen", "Resize")
+                },
+                content.into(),
+            )
+        }
+        Dialog::Adjust => {
+            let mut content = column![].spacing(14);
+            for (index, (nl, en, range)) in [
+                ("Helderheid", "Brightness", -100. ..=100.),
+                ("Contrast", "Contrast", -100. ..=100.),
+                ("Verzadiging", "Saturation", 0. ..=200.),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                content = content.push(w::body(look, app.tr(nl, en))).push(slider(
+                    range,
+                    app.corrections[index],
+                    move |v| Msg::Correction(index as u8, v),
+                ));
+            }
+            actions.push(w::button(
+                look,
+                app.tr("Toepassen", "Apply"),
+                K::Primary,
+                D::Regular,
+                None,
+                Some(Msg::Apply),
+            ));
+            (
+                app.tr("Kleurcorrecties", "Color adjustments"),
+                content.into(),
+            )
+        }
+        Dialog::Api => {
+            let mut content = column![
+                w::secondary(look, "REST API · 127.0.0.1:47831 · MCP stdio"),
+                text_input("http://127.0.0.1:47831", &app.api_base).on_input(Msg::ApiBase),
+                text_input("Bearer token", &app.api_token)
+                    .on_input(Msg::ApiToken)
+                    .secure(true),
+                text_input("Document UUID", &app.api_id).on_input(Msg::ApiId),
+                row![
+                    w::button(
+                        look,
+                        "Lijst",
+                        K::Secondary,
+                        D::Regular,
+                        None,
+                        Some(Msg::ApiAction("list"))
+                    ),
+                    w::button(
+                        look,
+                        "Upload",
+                        K::Secondary,
+                        D::Regular,
+                        None,
+                        Some(Msg::ApiAction("push"))
+                    ),
+                    w::button(
+                        look,
+                        "Download",
+                        K::Secondary,
+                        D::Regular,
+                        None,
+                        Some(Msg::ApiAction("pull"))
+                    )
+                ]
+                .spacing(8)
+            ]
+            .spacing(10);
+            for d in app.api_documents.iter().take(5) {
+                let id = d["id"].as_str().unwrap_or("").to_owned();
+                content = content.push(
+                    button(text(d["name"].as_str().unwrap_or("Document")).size(12))
+                        .on_press(Msg::ApiId(id)),
+                );
+            }
+            ("API / MCP", content.into())
+        }
+        Dialog::Close => {
+            actions.push(w::button(
+                look,
+                app.tr("Sluiten", "Close"),
+                K::Secondary,
+                D::Regular,
+                None,
+                Some(Msg::Exit),
+            ));
+            actions.push(w::button(
+                look,
+                app.tr("Opslaan en sluiten", "Save and close"),
+                K::Primary,
+                D::Regular,
+                None,
+                Some(Msg::Command(Command::Save)),
+            ));
+            (app.tr("Wijzigingen opslaan?","Save changes?"),w::body(look,app.tr("Het lokale concept is bewaard. Sla ook een IFCX-bestand op om het te delen.","Your local draft is kept. Save an IFCX file to share the image.")).into())
+        }
+        Dialog::Replace => {
+            actions.push(w::button(
+                look,
+                app.tr("Vervangen", "Replace"),
+                K::Primary,
+                D::Regular,
+                None,
+                Some(Msg::Replace),
+            ));
+            (app.tr("Afbeelding vervangen?","Replace image?"),w::body(look,app.tr("De huidige afbeelding heeft wijzigingen. Wil je de nieuwe afbeelding openen?","The current image has changes. Open the new image?")).into())
+        }
+    };
+    let body = column![content, w::secondary(look, &app.status)]
+        .spacing(10)
+        .into();
+    w::overlay(
+        look,
+        w::dialog(
+            look,
+            title,
+            i::CLOSE,
+            Some(Msg::Dialog(None)),
+            body,
+            None,
+            actions,
+            false,
+        ),
+    )
 }

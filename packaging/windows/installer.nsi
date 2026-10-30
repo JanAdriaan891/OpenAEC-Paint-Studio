@@ -1,7 +1,7 @@
 Unicode true
 !include "MUI2.nsh"
 Name "OpenAEC Paint Studio ${NUMBER}"
-OutFile "OpenAEC-Paint-Studio_${NUMBER}_x64-setup.exe"
+OutFile "${OUTPUT}"
 InstallDir "$LOCALAPPDATA\OpenAEC Paint Studio"
 InstallDirRegKey HKCU "Software\OpenAEC Paint Studio" ""
 RequestExecutionLevel user

@@ -1,145 +1,154 @@
-name: Build and verify
+name: Rust builds and verification
 on:
   push:
-    branches: [main]
+    branches: [main, rust-migration, 'codex/**']
   pull_request:
   workflow_dispatch:
-    inputs:
-      sign:
-        description: Sign release artifacts with the configured Ed25519 release key
-        type: boolean
-        default: false
 permissions:
   contents: read
+concurrency:
+  group: rust-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  verify:
+  linux:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: dtolnay/rust-toolchain@1.98.1
         with:
-          node-version: 22
-      - uses: pnpm/action-setup@v4
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm test
-      - name: Use the runner-provided Chrome browser
-        run: google-chrome --version
-      - run: PAINT_TEST_PRODUCTION=1 PAINT_TEST_BROWSER_CHANNEL=chrome pnpm test:ui
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcb-shape0-dev libxcb-xfixes0-dev desktop-file-utils
+      - run: cargo fmt -p paint-core -p paint-services -p openaec-paint-studio -p paint-tools --check
+      - run: cargo test --workspace --locked
+        env:
+          PAINT_SCREENSHOTS: ${{ github.workspace }}/artifacts/screenshots
+      - run: cargo build --workspace --release --locked
+      - run: target/release/paint-release package-linux artifacts/releases
+      - run: target/release/paint-release package-services artifacts/releases target/release linux-x64
+      - name: Portable AppImage with bundled desktop libraries
+        run: |
+          curl --fail --location --retry 3 https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -o /tmp/linuxdeploy.AppImage
+          chmod +x /tmp/linuxdeploy.AppImage
+          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 OUTPUT="$PWD/artifacts/releases/OpenAEC-Paint-Studio_2026.44.0_x86_64.AppImage" /tmp/linuxdeploy.AppImage --appdir 'artifacts/releases/OpenAEC Paint Studio.AppDir' --output appimage
+      - name: Validate package contents and image associations
+        run: |
+          dpkg-deb --info artifacts/releases/*.deb
+          desktop-file-validate packaging/linux/org.openaec.paint-studio.desktop
+          test -x 'artifacts/releases/deb-root/usr/bin/paint-mcp'
+          test -f 'artifacts/releases/deb-root/usr/share/mime/packages/openaec-paint-studio.xml'
       - uses: actions/upload-artifact@v4
         with:
-          name: web-and-services
+          name: linux-release
           path: |
-            dist/
-            dist-services/
-            package.json
-            pnpm-lock.yaml
-            pnpm-workspace.yaml
-            docs/
-  desktop:
-    needs: verify
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-24.04
-            bundles: deb,appimage
-          - os: windows-latest
-            bundles: nsis
-          - os: macos-latest
-            bundles: app,dmg
-    runs-on: ${{ matrix.os }}
+            artifacts/releases/*.deb
+            artifacts/releases/*.AppImage
+            artifacts/releases/*.tar.gz
+            target/release/paint-release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rust-ui-screenshots
+          path: artifacts/screenshots/*.png
+  windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - uses: pnpm/action-setup@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.1
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-      - name: Linux libraries
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libxdo-dev
-      - run: pnpm install --frozen-lockfile
-      - name: Import optional Windows signing certificate
-        if: runner.os == 'Windows'
+      - run: cargo build --workspace --release --locked
+      - name: Create NSIS installer with image Open With associations
         shell: pwsh
-        env:
-          CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-          CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
-          if ($env:CERTIFICATE) {
-            $path = Join-Path $env:RUNNER_TEMP 'paint-signing.pfx'
-            [IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($env:CERTIFICATE))
-            $password = ConvertTo-SecureString $env:CERTIFICATE_PASSWORD -AsPlainText -Force
-            $cert = Import-PfxCertificate -FilePath $path -CertStoreLocation Cert:\CurrentUser\My -Password $password | Where-Object { $_.HasPrivateKey } | Select-Object -First 1
-            if (-not $cert) { throw 'The PFX does not contain a signing private key' }
-            @{ bundle = @{ windows = @{ certificateThumbprint = $cert.Thumbprint; digestAlgorithm = 'sha256'; timestampUrl = 'http://timestamp.digicert.com' } } } | ConvertTo-Json -Depth 5 | Set-Content -Path native-signing.json
-            Remove-Item $path
-          }
-      - name: Import optional macOS signing certificate
-        if: runner.os == 'macOS'
-        shell: bash
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        run: |
-          if [ -n "$APPLE_CERTIFICATE" ]; then
-            test -n "$APPLE_SIGNING_IDENTITY" || { echo 'APPLE_SIGNING_IDENTITY is required'; exit 1; }
-            node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/paint.p12", Buffer.from(process.env.APPLE_CERTIFICATE,"base64"), {mode:384})'
-            PAINT_KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
-            security create-keychain -p "$PAINT_KEYCHAIN_PASSWORD" "$RUNNER_TEMP/paint.keychain-db"
-            security set-keychain-settings -lut 21600 "$RUNNER_TEMP/paint.keychain-db"
-            security unlock-keychain -p "$PAINT_KEYCHAIN_PASSWORD" "$RUNNER_TEMP/paint.keychain-db"
-            security import "$RUNNER_TEMP/paint.p12" -k "$RUNNER_TEMP/paint.keychain-db" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$PAINT_KEYCHAIN_PASSWORD" "$RUNNER_TEMP/paint.keychain-db"
-            security list-keychains -d user -s "$RUNNER_TEMP/paint.keychain-db" login.keychain-db
-            rm "$RUNNER_TEMP/paint.p12"
-          fi
-      - name: Native build
-        shell: bash
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || '-' }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          # The certificate was already imported above. Empty certificate variables
-          # still trigger Tauri's certificate importer, so remove them entirely.
-          unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD
-          if [ -z "$APPLE_ID" ]; then
-            unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
-          fi
-          if [ -f native-signing.json ]; then
-            pnpm tauri build --bundles '${{ matrix.bundles }}' --config native-signing.json
-          else
-            pnpm tauri build --bundles '${{ matrix.bundles }}'
-          fi
-      - name: Sign and verify distributable artifacts
-        if: github.event_name == 'workflow_dispatch' && inputs.sign
-        env:
-          RELEASE_KEY: ${{ secrets.PAINT_RELEASE_SIGNING_KEY }}
-        run: node scripts/sign-builds.mjs
+          $env:MAKENSIS = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          target/release/paint-release.exe package-windows artifacts/releases
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          target/release/paint-release.exe package-services artifacts/releases target/release windows-x64
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         with:
-          name: desktop-${{ matrix.os }}
+          name: windows-release
           path: |
-            src-tauri/target/release/bundle/**/*.deb
-            src-tauri/target/release/bundle/**/*.AppImage
-            src-tauri/target/release/bundle/**/*.exe
-            src-tauri/target/release/bundle/**/*.dmg
-            src-tauri/target/release/bundle/**/*.manifest.json
-            src-tauri/target/release/bundle/**/*.sig
-            src-tauri/target/release/bundle/**/*.pub.pem
-      - name: Remove temporary macOS keychain
-        if: always() && runner.os == 'macOS'
-        shell: bash
+            artifacts/releases/*.exe
+            artifacts/releases/*.tar.gz
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --workspace --release --locked --target aarch64-apple-darwin
+      - run: cargo build -p openaec-paint-studio -p paint-services --release --locked --target x86_64-apple-darwin
+      - name: Universal app and services for Apple Silicon and Intel
         run: |
-          if [ -f "$RUNNER_TEMP/paint.keychain-db" ]; then
-            security delete-keychain "$RUNNER_TEMP/paint.keychain-db"
-          fi
+          mkdir -p target/universal-release
+          for bin in openaec-paint-studio paint-api paint-mcp; do
+            lipo -create "target/aarch64-apple-darwin/release/$bin" "target/x86_64-apple-darwin/release/$bin" -output "target/universal-release/$bin"
+            lipo -verify_arch arm64 x86_64 "target/universal-release/$bin"
+          done
+          target/aarch64-apple-darwin/release/paint-release package-macos artifacts/releases target/universal-release
+          target/aarch64-apple-darwin/release/paint-release package-services artifacts/releases target/universal-release macos-universal
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-release
+          path: |
+            artifacts/releases/*.dmg
+            artifacts/releases/*.tar.gz
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build -p openaec-paint-studio --lib --release --locked --target wasm32-unknown-unknown --features web
+      - name: Generate matching Wasm bindings
+        run: |
+          curl --fail --location --retry 3 https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.130/wasm-bindgen-0.2.130-x86_64-unknown-linux-musl.tar.gz -o /tmp/wasm-bindgen.tar.gz
+          tar -xzf /tmp/wasm-bindgen.tar.gz -C /tmp
+          mkdir -p web-dist/pkg artifacts/releases
+          /tmp/wasm-bindgen-0.2.130-x86_64-unknown-linux-musl/wasm-bindgen target/wasm32-unknown-unknown/release/openaec_paint_studio.wasm --target web --out-dir web-dist/pkg
+          cp web/index.html web-dist/index.html
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Browser interaction and persistence smoke test
+        run: |
+          python3 -m http.server 49325 --bind 127.0.0.1 --directory web-dist >/tmp/paint-web.log 2>&1 &
+          node tests/web-smoke.mjs
+      - run: tar -czf artifacts/releases/OpenAEC-Paint-Studio_2026.44.0_web.tar.gz -C web-dist .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-release
+          path: artifacts/releases/*.tar.gz
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-screenshots
+          path: artifacts/browser/*.png
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.98.1
+      - name: Complete corresponding source with locked Cargo dependencies
+        run: |
+          mkdir -p artifacts/source artifacts/releases
+          git archive HEAD | tar -x -C artifacts/source
+          cargo vendor --locked --versioned-dirs artifacts/source/vendor-crates > /tmp/paint-vendor-config
+          mkdir -p artifacts/source/.cargo
+          cp /tmp/paint-vendor-config artifacts/source/.cargo/config.toml
+          # cargo vendor prints a repository-relative path. The archive builds from its own root.
+          sed -i 's|artifacts/source/vendor-crates|vendor-crates|' artifacts/source/.cargo/config.toml
+          tar -czf artifacts/releases/OpenAEC-Paint-Studio_2026.44.0_source.tar.gz -C artifacts/source .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-release
+          path: artifacts/releases/*.tar.gz
