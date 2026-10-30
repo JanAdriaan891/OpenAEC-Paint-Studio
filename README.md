@@ -1,73 +1,54 @@
 # OpenAEC Paint Studio
 
-A small image editor inspired by MS Paint, using the OpenAEC application style. Runs as a browser app or a Tauri 2 desktop application.
+A simple MS Paint inspired image editor, written in **Rust**. The native desktop editor and browser preview share the same image engine and iced UI. Version **2026.44.0** uses the current OpenAEC Blueprint library.
 
-[Download installers](https://github.com/JanAdriaan891/OpenAEC-Paint-Studio/releases/latest) · [Watch the demo preview (MP4, 55 seconds)](docs/demo/OpenAEC-Paint-Studio-2026.43.1-demo-preview.mp4)
-
-## Screenshots
-
-The editor with an example floor plan, drawing tools, colors and image commands in the Home ribbon.
-
-![OpenAEC Paint Studio editor with an annotated floor plan](docs/screenshots/paint-studio-overview.png)
-
-Inline text editing while retaining editable vector objects.
-
-![Inline text editor with font and size controls](docs/screenshots/paint-studio-text-editing.png)
-
-The Forge dark theme with all objects selected using Ctrl+A.
-
-![Forge dark theme with the whole document selected](docs/screenshots/paint-studio-dark-theme.png)
+[Download installers](https://github.com/JanAdriaan891/OpenAEC-Paint-Studio/releases/latest) · [Builds and signing](docs/RELEASING.md) · [API](docs/API.md) · [MCP](docs/MCP.md)
 
 ## Editor
 
-- Smooth brush strokes, eraser, flood fill, eyedropper, lines, rectangles, ellipses and inline text editing.
-- Brush size, opacity, filled/outlined shapes and a color palette.
-- Crop, resize, rotate left/right and flip horizontally/vertically. The Home ribbon brings drawing tools, text/object properties, image operations, view controls and canvas settings together. Focus mode enlarges the drawing workspace.
-- Optional **Keep vector objects**: select, move, resize and restyle drawn shapes/text. Geometry transforms preserve these objects. Export editable SVG.
-- Brightness, contrast, saturation, grayscale, invert and sepia. Raster corrections flatten the image; undo restores the original objects.
-- Open PNG, JPEG, WebP, GIF, BMP, TIFF, HEIC/HEIF, AVIF, PSD, SVG, ICO, TGA, JPEG 2000, JPEG XL and supported camera RAW variants, plus IFCX/IFCXB raster documents.
-- Native browser decoders handle common images; a bundled ImageMagick WebAssembly worker handles additional formats locally. See [format support and limits](docs/IMAGE-FORMATS.md).
-- Export PNG, JPEG, WebP or SVG; save the raster image embedded in IFCX or IFCXB.
-- Undo/redo (40 recent document states), Ctrl+wheel zoom, middle-button drag to pan, pixel grid and local draft recovery using IndexedDB.
-- Ctrl+A selects all objects together for moving, resizing or deleting; text fields retain normal text selection.
-- Dutch and English; light, Forge, OpenAEC, Blueprint and high contrast themes. Fonts are bundled for offline use.
+![Rust editor in the OpenAEC light theme](docs/screenshots/paint-studio-overview.png)
 
-## Run
+- Antialiased brush, eraser, fill, picker, line, rectangle, ellipse and editable multiline text.
+- Keep vector objects to select, move, resize, restyle and export them as SVG. Ctrl+A selects all objects; Escape returns to selection mode.
+- Crop, resize, rotate, mirror, grayscale, invert, sepia, brightness, contrast and saturation.
+- Open common images, HEIC, AVIF, PSD, JPEG XL, JPEG 2000 and supported camera RAW files. The default open dialog filters images; IFCX has its own command. [Supported formats and limits](docs/IMAGE-FORMATS.md).
+- Save a raster snapshot as IFCX/IFCXB, or export PNG, JPEG, lossless WebP and SVG. No `.oapaint` format.
+- Undo/redo, Ctrl+wheel zoom, middle-button pan, grid, local draft recovery and five Blueprint themes. Dutch/English interface.
+- Rust REST API and MCP stdio executables use the same renderer and document model. No Node runtime is needed for the editor or services.
 
-Use Node.js 22+ and pnpm 11.25.0. The desktop app additionally needs Rust stable and the [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/).
+The ribbon automatically changes each group from expanded controls to compact controls and then a group menu. Every command stays accessible without a horizontal scrollbar, including at the supported minimum width of 560 px.
+
+![Adaptive ribbon at a narrow window width](docs/screenshots/paint-studio-compact.png)
+
+![Rust editor in the Blueprint dark theme](docs/screenshots/paint-studio-dark-theme.png)
+
+## Build and run
+
+Use **Rust 1.98.1** and Cargo. Linux needs X11/Wayland and xkbcommon development libraries; Windows uses the MSVC toolchain; macOS uses Xcode command line tools.
 
 ```sh
-pnpm install --frozen-lockfile
-pnpm dev                 # http://127.0.0.1:3020
-pnpm tauri dev           # native desktop window
-pnpm build               # dist/ + dist-services/
-pnpm test                # renderer, formats, vectors, API, MCP and signing tests
-pnpm exec playwright install chromium
-pnpm test:ui             # browser integration tests
-pnpm tauri build --bundles deb,appimage  # Linux
+cargo run --release -p openaec-paint-studio
+cargo test --workspace --locked
+cargo build --workspace --release --locked
 ```
 
-Other native targets: `--bundles nsis` on Windows, `--bundles app,dmg` on macOS. Installers are written to `src-tauri/target/release/bundle/`. The API/MCP are separate Node processes and are not automatically started by the desktop installer.
+Release executables are `target/release/openaec-paint-studio`, `paint-api`, `paint-mcp` and `paint-release` (with `.exe` on Windows). An image filename can be passed to the desktop executable. Linux DEB/AppImage, Windows NSIS and universal macOS DMG builds include image Open With registration. Services are also distributed as separate native archives.
+
+The browser runs the same Rust application compiled to WebAssembly with the software renderer. JavaScript is limited to generated Wasm bindings and the module bootstrap. Run `scripts/build-web.sh`, then `python3 -m http.server 3020 --bind 127.0.0.1 --directory web-dist`.
+
+Browser interaction tests use Playwright as a development dependency: `pnpm install --frozen-lockfile`, `pnpm exec playwright install chromium`, then `pnpm test:web` against `PAINT_WEB_URL` (default port 49325). There is no JavaScript editor or JavaScript API server.
 
 ## API and MCP
 
 ```sh
-pnpm api                 # loopback only: http://127.0.0.1:47831
-pnpm mcp                 # MCP stdio; normally launched by your MCP host
+./target/release/paint-api
+./target/release/paint-mcp   # normally launched by an MCP host
 ```
 
-The API generates a private token at `.paint-data/token`. Enter this token in **Automation → Connect API**. Send the current image to the API or load an API document by ID. UI changes are exchanged explicitly: this is not live synchronization. Revision checks prevent one client from silently overwriting another's edits.
+The API listens on `127.0.0.1:47831` and creates a private `.paint-data/token`. Enter the token in the editor's API dialog to explicitly send or retrieve a document. Revision checks prevent stale edits from overwriting newer ones. API and MCP do not start automatically with the editor.
 
-After building, the services also run with `node dist-services/services/api.js` and `node dist-services/services/mcp.js` (install production dependencies first).
+IFCX saves contain the visible **raster image**, using the OpenAEC raster extension, rather than the editable scene. Browser drafts retain editable operations in the existing IndexedDB database; native Rust drafts use the platform's application data directory. Keep an export or backup for important work. See [IFCX](docs/IFCX.md).
 
-See [API](docs/API.md), [MCP](docs/MCP.md), and [builds and signing](docs/RELEASING.md).
+## Blueprint and licensing
 
-## Style provenance
-
-Adapted from [OpenAEC-Foundation/OpenAEC-style-book](https://github.com/OpenAEC-Foundation/OpenAEC-style-book), local revision `dfdcd415b26604081b1699560621d3e9ae7ea6bf`. Reuses the theme definitions, ribbon components and OpenAEC logo; the Paint shell follows its desktop workspace structure. No BIM/reporting modules from the template are included.
-
-OpenAEC brand assets and template-derived components remain **CC BY-SA 4.0**. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). New editor and service code is MIT licensed.
-
-### Linux user installation
-
-Build a DEB with `pnpm tauri build --bundles deb`, then run `node scripts/install-linux.mjs "path/to/OpenAEC Paint Studio_2026.43.0_amd64.deb"`. The installer checks system libraries, installs under `~/.local/share/openaec-paint-studio`, creates a launcher and menu entry, and associates supported image types; IFCX/IFCXB are offered as supported document types for the current user. Previous MIME defaults are saved under `~/.local/state/openaec-paint-studio`. No administrator password is needed. Opening an associated file imports it into the editor; each Linux launch opens its own window.
+UI and theme tokens come from [OpenAEC Blueprint](https://github.com/OpenAEC-Foundation/OpenAEC-Blueprint), revision `7a2f7cdc095e3854767af07e4e4cf07192498b8f`, with `openaec-ui 2026.44.1` vendored unchanged. New Paint code is MIT. Blueprint is LGPL-3.0, Rawler is LGPL-2.1, OpenAEC symbols/icons retain CC BY-SA 4.0, and bundled fonts retain their own licenses. Installers include dependency notices; each release includes complete corresponding source and locked dependencies for rebuilding modified components. See [third-party notices](THIRD_PARTY_NOTICES.md).

@@ -1,42 +1,52 @@
-# Builds and signing
+# Rust builds and releases
 
-## Local build
+Version **2026.44.0** uses native iced with the Blueprint UI library. The browser is the same Rust application compiled to Wasm. Node is only a development dependency for browser tests. Rust **1.98.1**, Cargo.lock and the pinned Blueprint revision define the build inputs.
 
-`pnpm build` checks TypeScript, builds the frontend and emits the standalone service JavaScript. `pnpm tauri build --bundles deb,appimage` produces Linux installers. Windows NSIS and macOS DMG builds run on their respective platforms using `.github/workflows/build.yml`.
-
-CI runs tests before the native build matrix. It uploads artifacts to the workflow run; it does not publish a release or create a GitHub repository. Release `2026.43` uses Git tag `2026.43` and package version `2026.43.0`. Patch release `2026.43.1` adds canvas navigation and select-all shortcuts; its tag and package version are both `2026.43.1`.
-
-## Detached release signing
-
-Release authenticity uses Ed25519 signatures over a manifest containing filename, size and SHA-256. The private key is kept outside the repository.
-
-Generate your release key once:
+## Verification
 
 ```sh
-mkdir -p ~/.config/openaec-paint-studio
-chmod 700 ~/.config/openaec-paint-studio
-openssl genpkey -algorithm ED25519 -out ~/.config/openaec-paint-studio/release-private.pem
-chmod 600 ~/.config/openaec-paint-studio/release-private.pem
-openssl pkey -in ~/.config/openaec-paint-studio/release-private.pem -pubout -out release-public.pem
+cargo fmt -p paint-core -p paint-services -p openaec-paint-studio -p paint-tools --check
+cargo test --workspace --locked
+cargo build --workspace --release --locked
 ```
 
-Do not replace an existing release key. Back up the private key securely. To sign and verify:
+Set `PAINT_SCREENSHOTS` to an absolute directory during tests to save real software-rendered UI screenshots at wide, compact and collapsed ribbon widths. `scripts/build-web.sh` builds the optimized Wasm app and matching wasm-bindgen 0.2.130 bindings. Serve web-dist on localhost and run the development-only Playwright smoke test (`pnpm test:web`, `PAINT_WEB_URL` defaults to port 49325).
+
+`.github/workflows/build.yml` builds and checks Linux, Windows, universal macOS, Wasm and complete corresponding source. It uploads artifacts; publishing a release is a separate deliberate step after required checks pass. See VALIDATION.md for recorded results and platform limits.
+
+## Packages
+
+From the repository root, after building all release binaries:
 
 ```sh
-PAINT_SIGNING_KEY_FILE=~/.config/openaec-paint-studio/release-private.pem pnpm sign path/to/app.deb
-pnpm verify path/to/app.deb release-public.pem
+target/release/paint-release package-linux artifacts/releases
+target/release/paint-release package-services artifacts/releases target/release linux-x64
 ```
 
-Distribute the artifact and its `.manifest.json`, `.sig` and `.pub.pem` files. Verification requires an independently trusted public key; downloading a public key from the same untrusted source as the binary does not establish publisher identity. This is artifact signing, not a trusted OS publisher certificate or Tauri automatic updater signature.
+The Linux command creates a DEB and AppDir. CI bundles the AppDir with official linuxdeploy into an AppImage. The DEB registers the app in Open With for supported images and IFCX. Install a system package using `sudo apt install ./OpenAEC-Paint-Studio_2026.44.0_amd64.deb`; the AppImage is portable. For a reversible installation without administrator rights, run `scripts/install-user.sh path/to/installer.deb`; this keeps older versions under the user data directory and updates the existing launcher. A menu/MIME entry does not forcibly replace the user's existing default image viewer.
 
-CI: add the PEM private key as `PAINT_RELEASE_SIGNING_KEY`, then run **Build and verify → sign=true**. Missing key material fails that signing step instead of producing a purportedly signed release. No private key is stored in CI artifacts.
+On Windows, set `MAKENSIS` to NSIS's makensis.exe and run `paint-release.exe package-windows artifacts/releases`. The per-user installer installs the editor, API/MCP and licenses, creates a shortcut and Open With capabilities, and includes an uninstaller. It preserves existing default-app choices.
 
-## Native code signing
+On macOS, CI builds aarch64-apple-darwin and x86_64-apple-darwin, combines all three executables with lipo, then runs `paint-release package-macos artifacts/releases target/universal-release`. The app bundle declares image/IFCX editor associations and the DMG is verified with hdiutil. The default build uses ad-hoc codesigning. A Developer ID identity can be supplied through `APPLE_SIGNING_IDENTITY` if its certificate is already imported; notarization is a separate publisher process.
 
-The build workflow supports these optional existing credentials:
+## Detached release signatures
 
-- Windows: `WINDOWS_CERTIFICATE` (base64 PFX), `WINDOWS_CERTIFICATE_PASSWORD`. Imports into the temporary runner certificate store and supplies the resulting thumbprint to Tauri's Authenticode signing configuration, using SHA-256 and a timestamp service.
-- macOS: `APPLE_CERTIFICATE` (base64 P12), `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`; notarization additionally requires `APPLE_ID`, `APPLE_PASSWORD` (app-specific password), `APPLE_TEAM_ID`.
-- Without these credentials, Windows builds are unsigned and macOS builds use ad-hoc signing. Detached Ed25519 signatures do not remove SmartScreen/Gatekeeper warnings. No automatic updater is advertised or configured.
+The Rust `paint-release` tool emits the same Ed25519 signed-manifest format as release 2026.43.1:
 
-Platform setup: [Tauri Windows signing](https://v2.tauri.app/distribute/sign/windows/), [macOS signing](https://v2.tauri.app/distribute/sign/macos/), [GitHub builds](https://v2.tauri.app/distribute/pipelines/github/).
+```sh
+paint-release sign path/to/installer /private/location/release-private.pem
+paint-release verify path/to/installer /trusted/location/release-public.pem
+paint-release checksums artifacts/releases
+```
+
+Alternatively set `PAINT_SIGNING_KEY_FILE`. Never put a private key in the repository or a release archive. Each artifact gets `.manifest.json` (schema 1, filename, byte count, SHA-256), `.sig` (base64 Ed25519 over the exact manifest bytes), and `.pub.pem`. Check against the **trusted repository public key**, rather than trusting an adjacent downloaded public key by itself. Publish SHA256SUMS and sign it as well.
+
+Detached Ed25519 signatures verify artifact provenance/integrity. They are separate from Windows Authenticode and Apple Developer ID/notarization. Builds without those publisher certificates may show the operating system's unidentified-publisher prompt.
+
+## Complete corresponding source
+
+Every release includes `OpenAEC-Paint-Studio_2026.44.0_source.tar.gz`. CI exports the exact commit, runs `cargo vendor --locked --versioned-dirs`, and adds `.cargo/config.toml` pointing to the included `vendor-crates`. This includes LGPL Blueprint and Rawler source plus the application source needed to rebuild/relink them.
+
+Extract the archive, install Rust 1.98.1 and your platform's system development libraries, then run `cargo build --offline --locked --workspace --release`. To use a modified dependency, edit its source and update/re-vendor the Cargo patch as appropriate. The installed app imposes no signature lock: replace the installed executable or run a rebuilt executable directly. Required third-party notices are collected by `paint-release legal` from locked Cargo metadata into each installer/service archive.
+
+The release should point to the final checked commit and contain all platform installers, native service archives, web archive, complete source, public key, checksums and detached signatures. Existing releases are retained.

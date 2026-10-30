@@ -1,14 +1,7 @@
-# Paint API and MCP service build
+# Native services
 
-This archive contains compiled JavaScript. Requires Node.js 22+ and pnpm 11.25.0.
+Release assets ending in `_services.tar.gz` contain `paint-api`, `paint-mcp`, their API/MCP documentation and dependency notices. Linux x64, Windows x64 (`.exe`) and universal macOS binaries need no Node runtime. Desktop installers include the same executables.
 
-```sh
-pnpm install --prod --frozen-lockfile
-node dist-services/services/api.js
-```
+Extract the archive and start `paint-api` from your chosen workspace directory. It creates `.paint-data/token` and `.paint-data/documents/`. Set `PAINT_DATA_DIR` to an absolute directory when launching the API/MCP from another working directory. Give your MCP host the absolute path to `paint-mcp` and the same data directory. Nothing starts automatically on login.
 
-Keep the API running. Start your MCP host with `node dist-services/services/mcp.js` as its stdio command (use absolute paths in the host configuration). See `docs/MCP.md` and `docs/API.md`.
-
-Source development scripts such as `pnpm dev`, `pnpm api` and `pnpm test` require the full source checkout. In this compiled archive, use the Node commands above.
-
-This package does not include a Node runtime or native desktop installer. `pnpm install` fetches the platform's native renderer dependency. Do not copy `node_modules` between operating systems.
+Use the signed manifest and trusted repository public key to verify the archive before extracting; see RELEASING.md. Back up the data directory to preserve documents.

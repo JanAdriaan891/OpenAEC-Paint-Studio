@@ -1,5 +1,5 @@
 use crate::{copy, run, tree, VERSION};
-use anyhow::{ensure, Result};
+use anyhow::{ensure, Context, Result};
 use std::{fs, path::Path, process::Command};
 
 /// Notices are gathered from the exact locked dependencies, including target-specific crates.
@@ -98,10 +98,10 @@ pub fn services(out: &Path, source: &Path, label: &str) -> Result<()> {
 
 pub fn windows(out: &Path) -> Result<()> {
     fs::create_dir_all(out)?;
-    let out = out.canonicalize()?;
-    let source = Path::new("target/release").canonicalize()?;
+    let out = canonical(out)?;
+    let source = canonical(Path::new("target/release"))?;
     let licenses = out.join("licenses");
-    legal(&licenses)?;
+    legal(&licenses).context("Collect Windows dependency licenses")?;
     let installer = out.join(format!("OpenAEC-Paint-Studio_{VERSION}_x64-setup.exe"));
     // NSIS uses the script's directory for relative icon paths.
     let compiler = std::env::var_os("MAKENSIS").unwrap_or_else(|| "makensis".into());
@@ -111,6 +111,22 @@ pub fn windows(out: &Path) -> Result<()> {
         .arg(format!("/DLEGAL={}", licenses.display()))
         .arg(format!("/DOUTPUT={}", installer.display()))
         .arg("packaging/windows/installer.nsi"))
+    .context("Run NSIS: install NSIS and set MAKENSIS to makensis.exe")
+}
+
+fn canonical(path: &Path) -> Result<std::path::PathBuf> {
+    let path = path.canonicalize()?;
+    #[cfg(windows)]
+    {
+        let value = path.to_string_lossy();
+        if let Some(rest) = value.strip_prefix(r"\\?\UNC\") {
+            return Ok(format!(r"\\{rest}").into());
+        }
+        if let Some(rest) = value.strip_prefix(r"\\?\") {
+            return Ok(rest.into());
+        }
+    }
+    Ok(path)
 }
 
 pub fn macos(out: &Path, source: &Path) -> Result<()> {

@@ -1,11 +1,29 @@
-# Validation — 23 October 2026
+# Validation — 2026.44.0 Rust migration
 
-- TypeScript/frontend and compiled Node service builds pass.
-- Nine integration/unit tests pass: rendering, flood fill, erasing/alpha, schema limits, API authentication/CORS/Host validation/persistence/revision conflicts, image formats, MCP stdio tools, release signing/tamper detection, vector transforms/SVG and color correction.
-- Seven browser integration tests pass: drawing/undo/export/rotation/draft restore, settings, import/resize/crop, Home controls/inline text/object move/SVG/focus, TIFF decoding in a worker, SVG opening, and a crop regression with a fill seed outside the crop region.
-- Format round trips cover PNG, JPEG, WebP, BMP, TIFF, GIF, PSD, ICO, TGA, AVIF and JPEG 2000. A public libheif HEIC example additionally decodes successfully (1280 × 854 px). See IMAGE-FORMATS.md for limits and distinctions from advertised reader capabilities.
-- The browser preview has been visually checked with the light and Forge themes. Desktop UI interaction and Windows/macOS installer builds have not been exercised locally; their build/signing setup is in the CI workflow.
-- All seven browser tests also pass against the production build, including the bundled WebAssembly worker. Tests use dedicated ports and refuse to reuse unrelated servers.
-- The emitted JavaScript API and MCP entrypoints were started as standalone Node processes; a document was created through the compiled MCP server against the compiled API.
+The Rust implementation replaces the React/Tauri editor, TypeScript image logic and Node API/MCP. Owned crates are paint-core, paint-services, openaec-paint-studio and paint-tools. UI provenance is pinned in vendor/BLUEPRINT-REVISION.
 
-- Linux release bundles built successfully: DEB (8.18 MiB) and AppImage (85.59 MiB). Both contain the production frontend and have detached Ed25519 signatures verified against `release-public.pem`. Web and compiled-service archives are signed and verified as well. These signatures are separate from OS publisher certificates.
+## Automated checks
+
+`cargo test --workspace --locked`: **27 tests passed** in the migration workspace:
+
+- 15 image/document integration tests: existing JSON compatibility, PNG alpha and image opacity, brush dots, fill/eraser, selection/history, vector geometry/SVG, crop/fill interaction, corrections, PNG/JPEG/WebP imports/exports, IFCX/IFCXB pixel/alpha roundtrips and invalid metadata/dimension rejection. Independent fixtures cover TIFF, PSD, AVIF, HEIC, JPEG XL and JPEG 2000; a generated Bayer DNG exercises real RAW development.
+- 2 adaptive ribbon policy tests.
+- 5 native UI tests: real tiny-skia screen rendering in three themes and multiple widths, measured control bounds from 560–1920 px, collapsed group command access, Escape behavior and zoom/pan without document edits.
+- 4 API/MCP/store tests: actual local HTTP authentication/origin/Host checks, document revisions, MCP-driven drawing and PNG export, persistence across restarts, remote URL rejection and a spawned MCP stdio process with protocol-only stdout.
+- 1 Ed25519 signing test rejects changed artifact bytes and a wrong trusted public key. The Rust verifier also successfully verifies a previous Node-signed installer against the existing repository key.
+
+Formatting is checked for all owned Rust crates. Vendored Blueprint sources are unchanged. Current README screenshots come from the real Rust renderer, rather than an HTML mockup.
+
+## Distribution checks
+
+The build workflow compiles Linux x64, Windows x64, universal Intel/Apple Silicon macOS and browser Wasm. Native process smoke checks render a PNG through each platform's built API. Linux also launches the desktop executable under Xvfb. Windows checks a silent NSIS installation and its Open With registration. macOS checks both architectures, ad-hoc codesigning and DMG integrity. Complete corresponding source includes locked Cargo dependencies and offline configuration.
+
+The Playwright smoke test exercises real Rust/Wasm drawing, undo/redo, Escape, Ctrl+A without DOM text selection, Ctrl+wheel zoom, middle-button pan, editable text, IndexedDB draft recovery, narrow ribbon layout and image-only open filtering. Browser tests run in isolated profiles and do not change the user's existing draft.
+
+A source archive and successful compilation cannot verify every operating-system interaction. Finder's native openFiles bridge and graphical behavior on physical Windows/macOS machines still benefit from normal platform acceptance testing. No Authenticode or Apple Developer ID/notarization certificate is configured; detached release signatures are independent Ed25519 signatures.
+
+## Compatibility and limits
+
+The API v1 document schema and six MCP tool names remain compatible with 2026.43.1. IFCX/IFCXB save a PNG raster, not editable scene operations. Browser IndexedDB retains the previous draft schema. Native Rust drafts use their own platform data location; old Tauri application data is retained by upgrades.
+
+Imports have bounded size/dimensions and depend on the decoder's supported profiles/camera models. First frame/page only; PSD layers are flattened; no dedicated color-management or RAW adjustment workflow. See IMAGE-FORMATS.md and IFCX.md.

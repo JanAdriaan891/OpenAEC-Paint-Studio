@@ -96,28 +96,38 @@ impl canvas::Program<Msg> for Board<'_> {
         let y0 = origin.y.max(0.);
         let x1 = (origin.x + size.width).min(bounds.width);
         let y1 = (origin.y + size.height).min(bounds.height);
-        let tile = 12.;
-        let mut y = y0;
-        while y < y1 {
-            let mut x = x0;
-            while x < x1 {
-                let v = if (((x - origin.x) / tile).floor() as i32
-                    + ((y - origin.y) / tile).floor() as i32)
-                    % 2
-                    == 0
-                {
-                    0.96
-                } else {
-                    0.86
-                };
-                f.fill_rectangle(
-                    Point::new(x, y),
-                    Size::new(tile.min(x1 - x), tile.min(y1 - y)),
-                    Color::from_rgb(v, v, v),
-                );
-                x += tile;
-            }
-            y += tile;
+        // Opaque paper covers this pattern completely. Avoid thousands of hidden
+        // paths on every pointer event; transparent paper uses one compound path.
+        if app.editor.document.background == "transparent" && x1 > x0 && y1 > y0 {
+            f.fill_rectangle(
+                Point::new(x0, y0),
+                Size::new(x1 - x0, y1 - y0),
+                Color::from_rgb(0.96, 0.96, 0.96),
+            );
+            let tile = 12.;
+            let checks = Path::new(|path| {
+                let first_column = ((x0 - origin.x) / tile).floor() as i32;
+                let first_row = ((y0 - origin.y) / tile).floor() as i32;
+                let mut row = first_row;
+                while origin.y + row as f32 * tile < y1 {
+                    let mut column = first_column;
+                    while origin.x + column as f32 * tile < x1 {
+                        if (row + column).rem_euclid(2) == 1 {
+                            let left = (origin.x + column as f32 * tile).max(x0);
+                            let top = (origin.y + row as f32 * tile).max(y0);
+                            let right = (origin.x + (column + 1) as f32 * tile).min(x1);
+                            let bottom = (origin.y + (row + 1) as f32 * tile).min(y1);
+                            path.rectangle(
+                                Point::new(left, top),
+                                Size::new(right - left, bottom - top),
+                            );
+                        }
+                        column += 1;
+                    }
+                    row += 1;
+                }
+            });
+            f.fill(&checks, Color::from_rgb(0.86, 0.86, 0.86));
         }
         f.draw_image(Rectangle::new(origin, size), &app.image);
         f.stroke_rectangle(

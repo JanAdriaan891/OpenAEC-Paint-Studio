@@ -1,17 +1,14 @@
 # MCP server
 
-The server uses the official MCP TypeScript SDK v2 and stdio transport. It calls the same authenticated local API as the editor. Start the API first. The MCP host launches the stdio process; do not run it as an HTTP endpoint.
-
-Example host configuration (replace absolute paths):
+The Rust `paint-mcp` executable implements newline-delimited JSON-RPC over stdio. It calls the same authenticated localhost API as the editor. Start `paint-api` first; the MCP host launches `paint-mcp`. No Node or SDK installation is required.
 
 ```json
 {
   "mcpServers": {
     "openaec-paint-studio": {
-      "command": "/absolute/path/to/node",
-      "args": ["/absolute/path/to/OpenAEC Paint/dist-services/services/mcp.js"],
+      "command": "/absolute/path/to/paint-mcp",
       "env": {
-        "PAINT_DATA_DIR": "/absolute/path/to/OpenAEC Paint/.paint-data",
+        "PAINT_DATA_DIR": "/absolute/path/to/paint-workspace",
         "PAINT_API_URL": "http://127.0.0.1:47831"
       }
     }
@@ -19,15 +16,15 @@ Example host configuration (replace absolute paths):
 }
 ```
 
-`pnpm build` generates that entry point. The server reads the API token from the configured data directory; alternatively supply the same `PAINT_API_TOKEN` as the API. Tokens are never embedded in project files. MCP logs use stderr, leaving stdout for the protocol.
+On Windows use the installed `paint-mcp.exe` path. API and MCP must use the same data directory/token. Alternatively set `PAINT_API_TOKEN` in both process environments. The token is never written to stdout; stdout is exclusively protocol messages. Supported negotiation versions: 2024-11-05, 2025-03-26, 2025-06-18 and 2025-11-25.
 
-Tools:
+| Tool | Action |
+| --- | --- |
+| `paint_list_documents` | List saved API documents |
+| `paint_create_document` | Create an image and receive ID/revision |
+| `paint_get_document` | Read a document and revision |
+| `paint_draw` | Append operations with `expectedRevision` |
+| `paint_undo` | Remove the last operation with `expectedRevision` |
+| `paint_export_png` | Return the rendered PNG as an MCP image block |
 
-- `paint_list_documents` — list saved API drawings.
-- `paint_create_document` — create a blank image and receive its ID/revision.
-- `paint_get_document` — read the image and revision.
-- `paint_draw` — append validated drawing operations with `expectedRevision`.
-- `paint_undo` — undo the last drawing operation with `expectedRevision`.
-- `paint_export_png` — return the rendered PNG as an MCP image block.
-
-Example request: “Create a 1200 × 800 image, draw an amber rectangle with a dark outline, and show me the PNG.” The host first creates a document, draws operations using the returned revision, then calls export. Load its ID in **Automation → Load from API** to continue manually. There is no background UI synchronization.
+The tool names and document schema remain compatible with 2026.43.1. Ask a host to create an image, draw operations using the returned revision, then export the PNG. Retrieve its document ID in the editor's API dialog to continue editing. Transfers are explicit; there is no background synchronization.

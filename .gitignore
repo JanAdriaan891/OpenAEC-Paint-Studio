@@ -18,3 +18,4 @@ native-signing.json
 /target/
 
 /web-dist/
+__pycache__/

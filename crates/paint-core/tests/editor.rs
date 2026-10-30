@@ -200,3 +200,23 @@ fn rust_decoders_open_independently_generated_image_formats() {
         assert!(p[2] > 220 && p[0] < 30 && p[1] < 30, "{name}: {p:?}");
     }
 }
+
+#[test]
+fn develops_a_generated_camera_raw_dng() {
+    let doc = import_image(include_bytes!("fixtures/sensor.dng"), "sensor.dng").unwrap();
+    assert_eq!((doc.width, doc.height), (32, 24));
+    let p = pixel(&doc, 16, 12);
+    assert_eq!(p[3], 255);
+    assert!(p[0] > 20 && p[1] > 20 && p[2] > 20, "{p:?}");
+}
+
+#[test]
+fn image_object_opacity_is_composited() {
+    let mut source = Document::new(16, 16, "source");
+    source.background = "#0000ff".into();
+    let mut doc = import_image(&export_image(&source, "png").unwrap(), "blue.png").unwrap();
+    doc.operations[0].opacity = 0.5;
+    let p = pixel(&doc, 8, 8);
+    assert_eq!(p[2], 255);
+    assert!((127..=128).contains(&p[3]));
+}

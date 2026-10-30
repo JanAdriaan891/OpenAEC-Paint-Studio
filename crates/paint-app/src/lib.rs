@@ -1,6 +1,8 @@
 //! Native OpenAEC Paint Studio and its browser build, both authored in Rust.
 mod canvas;
 mod icons;
+#[cfg(target_os = "macos")]
+mod macos;
 mod platform;
 mod view;
 #[cfg(target_arch = "wasm32")]
@@ -40,6 +42,8 @@ pub enum Command {
     Redo,
     SelectAll,
     Delete,
+    Background(bool),
+    Clear,
     Fit,
     Actual,
     Zoom(f32),
@@ -59,6 +63,7 @@ pub enum Command {
 }
 #[derive(Debug, Clone)]
 pub enum Msg {
+    PollFiles,
     DraftLoaded(Result<Option<Document>, String>),
     DraftStored(u64, Result<(), String>),
     Modifiers(iced::keyboard::Modifiers),
@@ -117,6 +122,7 @@ pub enum Gesture {
     },
 }
 pub struct App {
+    pub window_ready: bool,
     pub pending_draft: Option<Document>,
     pub draft_generation: u64,
     pub modifiers: iced::keyboard::Modifiers,
@@ -167,6 +173,7 @@ impl App {
         let image = Self::handle(&document)
             .unwrap_or_else(|_| image::Handle::from_rgba(1, 1, vec![255, 255, 255, 255]));
         let mut app = Self {
+            window_ready: false,
             pending_draft: None,
             draft_generation: 0,
             modifiers: iced::keyboard::Modifiers::default(),
@@ -189,7 +196,7 @@ impl App {
             grid: false,
             focus: false,
             inspector: true,
-            status: "Gereed · Rust".into(),
+            status: "Gereed".into(),
             busy: false,
             color_text: "#36363e".into(),
             size_text: "8".into(),
@@ -235,7 +242,13 @@ impl App {
         self.pending_draft = Some(self.editor.document.clone());
     }
     pub fn update(&mut self, message: Msg) -> Task<Msg> {
+        #[cfg(target_arch = "wasm32")]
+        let had_text = self.text_box.is_some();
         let task = self.update_inner(message);
+        #[cfg(target_arch = "wasm32")]
+        if had_text && self.text_box.is_none() {
+            web::focus_canvas();
+        }
         if let Some(doc) = self.pending_draft.take() {
             self.draft_generation += 1;
             let generation = self.draft_generation;
@@ -401,6 +414,15 @@ impl App {
     }
     fn update_inner(&mut self, message: Msg) -> Task<Msg> {
         match message {
+            Msg::PollFiles =>
+            {
+                #[cfg(target_os = "macos")]
+                if self.pending_document.is_none() && !self.busy {
+                    if let Some(path) = macos::take() {
+                        return self.update(Msg::Launch(path));
+                    }
+                }
+            }
             Msg::DraftLoaded(result) => match result {
                 Ok(Some(doc)) if !self.editor.dirty => self.load(doc),
                 Err(e) => self.status = format!("Concept kon niet worden hersteld: {e}"),
@@ -409,9 +431,7 @@ impl App {
             Msg::DraftStored(generation, result) => {
                 if generation == self.draft_generation {
                     self.status = match result {
-                        Ok(()) => self
-                            .tr("Concept opgeslagen · Rust", "Draft saved · Rust")
-                            .into(),
+                        Ok(()) => self.tr("Concept opgeslagen", "Draft saved").into(),
                         Err(e) => format!("Concept kon niet worden opgeslagen: {e}"),
                     };
                 }
@@ -484,6 +504,11 @@ impl App {
                 }
             }
             Msg::Resized(size) => {
+                if !self.window_ready {
+                    self.window_ready = true;
+                    #[cfg(target_arch = "wasm32")]
+                    web::focus_canvas();
+                }
                 self.width = size;
                 if self.auto_fit {
                     self.fit();
@@ -491,6 +516,8 @@ impl App {
             }
             Msg::Key(key, modifiers) => return self.key(key, modifiers),
             Msg::Opened(result) => {
+                #[cfg(target_arch = "wasm32")]
+                web::focus_canvas();
                 self.busy = false;
                 match result {
                     Ok(Some((name, bytes))) => match paint_core::codec::import_image(&bytes, &name)
@@ -713,6 +740,21 @@ impl App {
                 let result = self.editor.delete_selection();
                 self.changed(result);
             }
+            Command::Background(transparent) => {
+                let mut doc = self.editor.document.clone();
+                doc.background = if transparent {
+                    "transparent"
+                } else {
+                    "#ffffff"
+                }
+                .into();
+                self.commit(doc);
+            }
+            Command::Clear => {
+                let mut doc = self.editor.document.clone();
+                doc.operations.clear();
+                self.commit(doc);
+            }
             Command::Fit => self.fit(),
             Command::Actual => {
                 self.zoom_at(
@@ -790,6 +832,13 @@ impl App {
         if key == Key::Named(Named::Escape) {
             self.cancel();
             return Task::none();
+        }
+        if key == Key::Named(Named::Tab) {
+            return if m.shift() {
+                iced::widget::operation::focus_previous()
+            } else {
+                iced::widget::operation::focus_next()
+            };
         }
         if self.dialog.is_some() {
             return Task::none();
@@ -1062,7 +1111,7 @@ impl App {
         }
     }
     pub fn subscription(&self) -> Subscription<Msg> {
-        iced::event::listen_with(|event, status, _| match event {
+        let events = iced::event::listen_with(|event, status, _| match event {
             iced::Event::Window(
                 iced::window::Event::Resized(size) | iced::window::Event::Opened { size, .. },
             ) => Some(Msg::Resized(size)),
@@ -1083,7 +1132,18 @@ impl App {
                 Some(Msg::Key(key, modifiers))
             }
             _ => None,
-        })
+        });
+        #[cfg(target_os = "macos")]
+        {
+            Subscription::batch([
+                events,
+                iced::time::every(std::time::Duration::from_millis(150)).map(|_| Msg::PollFiles),
+            ])
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            events
+        }
     }
     pub fn view(&self) -> Element<'_, Msg> {
         view::view(self)
@@ -1093,6 +1153,8 @@ pub fn run() -> iced::Result {
     fonts::install_fallback();
     let builder = iced::application(
         || {
+            #[cfg(target_os = "macos")]
+            macos::install();
             let app = App::default();
             #[cfg(not(target_arch = "wasm32"))]
             let launch = std::env::args_os()

@@ -1,6 +1,6 @@
 [workspace]
 members = ["crates/paint-core", "crates/paint-services", "crates/paint-app", "crates/paint-tools"]
-exclude = ["vendor/openaec-ui", "vendor/avif-decode", "src-tauri"]
+exclude = ["vendor/openaec-ui", "vendor/avif-decode"]
 resolver = "2"
 
 [workspace.package]

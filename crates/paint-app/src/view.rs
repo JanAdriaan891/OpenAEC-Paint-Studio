@@ -94,10 +94,7 @@ pub fn view(app: &App) -> Element<'_, Msg> {
     }
     title = title.push(Space::new().width(Length::Fill));
     if app.width.width >= 900. {
-        title = title.push(w::secondary(
-            look,
-            format!("{} · Rust", app.editor.document.name),
-        ));
+        title = title.push(w::secondary(look, app.editor.document.name.clone()));
     }
     title = title
         .push(w::secondary(look, VERSION))
@@ -619,7 +616,6 @@ fn inspector(app: &App) -> Element<'_, Msg> {
                 .width(Length::Fill),
         );
     }
-    items = items.push(w::secondary(look, "Rust · Blueprint UI 0.4"));
     container(scrollable(items))
         .width(230)
         .height(Length::Fill)
@@ -776,6 +772,18 @@ fn popup(app: &App, index: usize) -> Element<'_, Msg> {
                 false,
                 Some(Msg::Tool(Tool::Crop)),
             ));
+            content = content
+                .push(w::checkbox(
+                    look,
+                    app.tr("Transparante achtergrond", "Transparent background"),
+                    app.editor.document.background == "transparent",
+                    Some(|v| Msg::Command(Command::Background(v))),
+                ))
+                .push(simple(
+                    app,
+                    app.tr("Canvas wissen", "Clear canvas"),
+                    Command::Clear,
+                ));
         }
         5 => {
             for (nl, en, icon, cmd) in [

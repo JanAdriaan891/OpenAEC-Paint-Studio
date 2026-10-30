@@ -1,5 +1,14 @@
 //! Browser integration. All editor behaviour remains in Rust.
 use wasm_bindgen::{prelude::*, JsCast};
+pub fn focus_canvas() {
+    if let Some(canvas) = web_sys::window()
+        .and_then(|w| w.document())
+        .and_then(|d| d.query_selector("canvas").ok().flatten())
+        .and_then(|e| e.dyn_into::<web_sys::HtmlCanvasElement>().ok())
+    {
+        let _ = canvas.focus();
+    }
+}
 pub fn install() {
     let Some(window) = web_sys::window() else {
         return;
@@ -24,7 +33,7 @@ pub fn install() {
     );
     listener.forget();
     if let Some(doc) = window.document() {
-        doc.set_title("OpenAEC Paint Studio — Rust");
+        doc.set_title("OpenAEC Paint Studio");
     }
     let _ = rayon::ThreadPoolBuilder::new()
         .num_threads(1)
