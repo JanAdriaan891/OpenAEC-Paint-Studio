@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=OpenAEC Paint Studio
+Comment=Afbeeldingen bewerken met de native Rust-editor van OpenAEC
+Exec=openaec-paint-studio %f
+Icon=org.openaec.paint-studio
+Terminal=false
+Categories=Graphics;RasterGraphics;2DGraphics;
+MimeType=image/png;image/jpeg;image/webp;image/gif;image/bmp;image/tiff;image/svg+xml;image/heic;image/heif;image/avif;image/vnd.adobe.photoshop;image/jxl;image/jp2;image/x-tga;image/x-exr;application/x-ifcx;application/x-ifcxb;

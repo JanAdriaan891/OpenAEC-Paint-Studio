@@ -1,0 +1,46 @@
+[package]
+name = "openaec-paint-studio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "openaec-paint-studio"
+path = "src/main.rs"
+
+[features]
+default = []
+web = []
+
+[dependencies]
+paint-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+base64.workspace = true
+uuid.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+openaec-ui = { path = "../../vendor/openaec-ui" }
+iced = { version = "=0.14.0", default-features = false, features = ["tiny-skia", "image", "svg", "canvas", "advanced", "thread-pool"] }
+rfd = { version = "0.16", default-features = false, features = ["xdg-portal", "async-std", "file-handle-inner"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+directories = "6"
+iced = { version = "=0.14.0", default-features = false, features = ["tokio"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = ["Window", "Storage", "Document", "Element", "HtmlCanvasElement", "Event", "WheelEvent", "EventTarget", "AddEventListenerOptions", "Blob", "ImageBitmap", "CanvasRenderingContext2d"] }
+console_error_panic_hook = "0.1"
+js-sys = "0.3"
+rayon = "1"
+rexie = "0.6"
+serde-wasm-bindgen = "0.6"
+
+[dev-dependencies]
+iced_tiny_skia = "0.14"
+tiny-skia = "0.11"

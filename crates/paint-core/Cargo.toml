@@ -1,0 +1,27 @@
+[package]
+name = "paint-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+base64.workspace = true
+uuid.workspace = true
+image.workspace = true
+tiny-skia = "0.11"
+fontdue = "0.9"
+flate2 = "1"
+ciborium = "0.2"
+resvg = { version = "0.45", default-features = false, features = ["text", "raster-images"] }
+heic-rs = { version = "=0.1.4", default-features = false, features = ["std"] }
+psd = "=0.3.5"
+jxl-oxide = { version = "=0.12.6", default-features = false, features = ["image"] }
+hayro-jpeg2000 = { version = "=0.4.1", default-features = false, features = ["std", "image"] }
+rawler = "=0.8.0"
+bytemuck = "1"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+avif-decode = { version = "=3.0.0", default-features = false }

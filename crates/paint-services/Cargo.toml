@@ -1,0 +1,20 @@
+[package]
+name = "paint-services"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+paint-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+uuid.workspace = true
+base64.workspace = true
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+subtle = "2"
+
+[dev-dependencies]
+tempfile = "3"

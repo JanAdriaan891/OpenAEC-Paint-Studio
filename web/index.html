@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#36363e"><title>OpenAEC Paint Studio — Rust</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f1eeea}canvas{display:block;width:100%;height:100%;outline:0;touch-action:none}#loading{position:absolute;inset:0;display:grid;place-items:center;font:16px system-ui;color:#36363e}#loading.hidden{display:none}</style></head>
+<body><div id="loading" role="status">OpenAEC Paint Studio laden…</div><script type="module">
+import init from './pkg/openaec_paint_studio.js';
+try { await init(); document.getElementById('loading').remove(); } catch (error) { document.getElementById('loading').textContent = 'Starten is mislukt: ' + error.message; }
+</script></body></html>

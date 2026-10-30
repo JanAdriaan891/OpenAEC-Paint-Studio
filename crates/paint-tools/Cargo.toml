@@ -1,0 +1,20 @@
+[package]
+name = "paint-tools"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "paint-release"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+base64.workspace = true
+sha2 = "0.10"
+ed25519-dalek = { version = "2", features = ["pkcs8", "pem"] }
+
+[dev-dependencies]
+tempfile = "3"

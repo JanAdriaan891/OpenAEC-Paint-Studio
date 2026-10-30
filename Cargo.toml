@@ -1,0 +1,28 @@
+[workspace]
+members = ["crates/paint-core", "crates/paint-services", "crates/paint-app", "crates/paint-tools"]
+exclude = ["vendor/openaec-ui", "vendor/avif-decode", "src-tauri"]
+resolver = "2"
+
+[workspace.package]
+version = "2026.44.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/JanAdriaan891/OpenAEC-Paint-Studio"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+base64 = "0.22"
+uuid = { version = "1", features = ["v4", "serde", "js"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff", "ico", "tga", "pnm", "qoi", "hdr", "exr", "dds", "ff"] }
+paint-core = { path = "crates/paint-core" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 8
+strip = true
+
+[patch.crates-io]
+avif-decode = { path = "vendor/avif-decode" }
