@@ -1,6 +1,6 @@
 [workspace]
 members = ["crates/paint-core", "crates/paint-services", "crates/paint-app", "crates/paint-tools"]
-exclude = ["vendor/openaec-ui", "vendor/avif-decode"]
+exclude = ["vendor/openaec-ui", "vendor/avif-decode", "vendor/rawler"]
 resolver = "2"
 
 [workspace.package]
@@ -26,3 +26,5 @@ strip = true
 
 [patch.crates-io]
 avif-decode = { path = "vendor/avif-decode" }
+
+rawler = { path = "vendor/rawler" }

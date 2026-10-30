@@ -16,7 +16,7 @@ Inter and JetBrains Mono are provided by Blueprint under SIL Open Font License 1
 
 ## Image and runtime dependencies
 
-Cargo.lock records exact versions. This includes iced, tiny-skia, resvg, fontdue, image, heic-rs, psd, jxl-oxide, hayro-jpeg2000, Rawler, rav1d/avif-decode, axum, tokio, reqwest and Ed25519-dalek. **Rawler 0.8.0 is LGPL-2.1**. `vendor/avif-decode` retains its BSD-3-Clause license and documents the bounded-decoder/build changes in `PAINT-CHANGES.md`. The application is statically linked; it imposes no signature or installation lock on modified binaries.
+Cargo.lock records exact versions. This includes iced, tiny-skia, resvg, fontdue, image, heic-rs, psd, jxl-oxide, hayro-jpeg2000, Rawler, rav1d/avif-decode, axum, tokio, reqwest and Ed25519-dalek. **Rawler 0.8.0 is LGPL-2.1**; its library source and camera/lens database are in `vendor/rawler`, with the browser clock patch documented in `PAINT-CHANGES.md`. `vendor/avif-decode` retains its BSD-3-Clause license and documents the bounded-decoder/build changes in `PAINT-CHANGES.md`. The application is statically linked; it imposes no signature or installation lock on modified binaries.
 
 `paint-release legal` collects license/notice files and exact package license identifiers into each installer/service package. The release's **source.tar.gz** contains application source, all locked Cargo dependencies and offline Cargo configuration. It is the complete corresponding source for the linked LGPL components and the application code needed to rebuild/relink them; see `docs/RELEASING.md`.
 

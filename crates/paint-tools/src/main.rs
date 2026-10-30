@@ -146,7 +146,18 @@ fn package_linux(out: &Path) -> Result<()> {
         root.join("usr/share/icons/hicolor/128x128/apps/org.openaec.paint-studio.png"),
     )?;
     packaging::legal(&root.join("usr/share/doc/open-aec-paint-studio"))?;
-    fs::write(root.join("DEBIAN/control"),format!("Package: open-aec-paint-studio\nVersion: {VERSION}\nArchitecture: amd64\nMaintainer: OpenAEC contributors\nSection: graphics\nPriority: optional\nDepends: libxkbcommon0, libx11-6, libxcb1, libwayland-client0\nDescription: OpenAEC Paint Studio native Rust image editor\n"))?;
+    for package in ["libxkbcommon0", "libxkbcommon-x11-0", "libxcb-xkb1"] {
+        let copyright = Path::new("/usr/share/doc").join(package).join("copyright");
+        if copyright.exists() {
+            copy(
+                copyright,
+                root.join("usr/share/doc/open-aec-paint-studio/native")
+                    .join(format!("{package}-copyright")),
+            )?;
+        }
+    }
+
+    fs::write(root.join("DEBIAN/control"),format!("Package: open-aec-paint-studio\nVersion: {VERSION}\nArchitecture: amd64\nMaintainer: OpenAEC contributors\nSection: graphics\nPriority: optional\nRecommends: xdg-desktop-portal\nDepends: libxkbcommon0, libxkbcommon-x11-0, libx11-6, libxcb1, libwayland-client0\nDescription: OpenAEC Paint Studio native Rust image editor\n"))?;
     run(Command::new("dpkg-deb")
         .arg("--build")
         .arg("--root-owner-group")

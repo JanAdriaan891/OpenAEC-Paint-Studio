@@ -20,7 +20,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev libx11-dev libxcb-shape0-dev libxcb-xfixes0-dev desktop-file-utils xvfb
+      - run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libx11-dev libxcb-shape0-dev libxcb-xfixes0-dev desktop-file-utils xvfb
       - run: cargo fmt -p paint-core -p paint-services -p openaec-paint-studio -p paint-tools --check
       - run: cargo test --workspace --locked
         env:
@@ -33,7 +33,7 @@ jobs:
         run: |
           curl --fail --location --retry 3 https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -o /tmp/linuxdeploy.AppImage
           chmod +x /tmp/linuxdeploy.AppImage
-          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 OUTPUT="$PWD/artifacts/releases/OpenAEC-Paint-Studio_2026.44.0_x86_64.AppImage" /tmp/linuxdeploy.AppImage --appdir 'artifacts/releases/OpenAEC Paint Studio.AppDir' --output appimage
+          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 OUTPUT="$PWD/artifacts/releases/OpenAEC-Paint-Studio_2026.44.0_x86_64.AppImage" /tmp/linuxdeploy.AppImage --appdir 'artifacts/releases/OpenAEC Paint Studio.AppDir' --library /usr/lib/x86_64-linux-gnu/libxkbcommon-x11.so.0 --library /usr/lib/x86_64-linux-gnu/libxkbcommon.so.0 --output appimage
       - name: Validate package contents and image associations
         run: |
           dpkg-deb --info artifacts/releases/*.deb
@@ -143,6 +143,7 @@ jobs:
             lipo -create "target/aarch64-apple-darwin/release/$bin" "target/x86_64-apple-darwin/release/$bin" -output "target/universal-release/$bin"
             lipo "target/universal-release/$bin" -verify_arch arm64 x86_64
             chmod +x "target/universal-release/$bin"
+            codesign --force --sign - --timestamp=none "target/universal-release/$bin"
           done
           python3 tests/native-smoke.py target/universal-release
           target/aarch64-apple-darwin/release/paint-release package-macos artifacts/releases target/universal-release

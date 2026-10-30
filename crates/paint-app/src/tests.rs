@@ -205,3 +205,26 @@ fn render_screens() {
         }
     }
 }
+
+#[test]
+fn text_that_exceeds_document_limits_remains_available_for_correction() {
+    let mut app = example();
+    let before = app.editor.document.clone();
+    let text = "x".repeat(2001);
+    app.text_box = Some(TextDraft {
+        content: text_editor::Content::with_text(&text),
+        at: paint_core::Point::new(50., 50.),
+        index: None,
+    });
+    let _ = app.update(Msg::Command(Command::ApplyText));
+    assert_eq!(app.editor.document, before);
+    assert_eq!(
+        app.text_box
+            .as_ref()
+            .unwrap()
+            .content
+            .text()
+            .trim_end_matches('\n'),
+        text
+    );
+}

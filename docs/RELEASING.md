@@ -23,7 +23,7 @@ target/release/paint-release package-linux artifacts/releases
 target/release/paint-release package-services artifacts/releases target/release linux-x64
 ```
 
-The Linux command creates a DEB and AppDir. CI bundles the AppDir with official linuxdeploy into an AppImage. The DEB registers the app in Open With for supported images and IFCX. Install a system package using `sudo apt install ./OpenAEC-Paint-Studio_2026.44.0_amd64.deb`; the AppImage is portable. For a reversible installation without administrator rights, run `scripts/install-user.sh path/to/installer.deb`; this keeps older versions under the user data directory and updates the existing launcher. A menu/MIME entry does not forcibly replace the user's existing default image viewer.
+The Linux command creates a DEB and AppDir. CI bundles the AppDir with official linuxdeploy into an AppImage, explicitly including the dynamically loaded xkbcommon/X11 libraries and their notices. The DEB registers the app in Open With for supported images and IFCX. Install a system package using `sudo apt install ./OpenAEC-Paint-Studio_2026.44.0_amd64.deb`; the AppImage is portable. For a reversible installation without administrator rights, run `scripts/install-user.sh path/to/installer.deb`; this keeps older versions under the user data directory and updates the existing launcher. A menu/MIME entry does not forcibly replace the user's existing default image viewer.
 
 On Windows, set `MAKENSIS` to NSIS's makensis.exe and run `paint-release.exe package-windows artifacts/releases`. The per-user installer installs the editor, API/MCP and licenses, creates a shortcut and Open With capabilities, and includes an uninstaller. It preserves existing default-app choices.
 

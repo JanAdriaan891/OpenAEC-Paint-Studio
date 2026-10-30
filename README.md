@@ -24,7 +24,7 @@ The ribbon automatically changes each group from expanded controls to compact co
 
 ## Build and run
 
-Use **Rust 1.98.1** and Cargo. Linux needs X11/Wayland and xkbcommon development libraries; Windows uses the MSVC toolchain; macOS uses Xcode command line tools.
+Use **Rust 1.98.1** and Cargo. Linux needs X11/Wayland, xkbcommon and xkbcommon-x11 development libraries; Windows uses the MSVC toolchain; macOS uses Xcode command line tools.
 
 ```sh
 cargo run --release -p openaec-paint-studio

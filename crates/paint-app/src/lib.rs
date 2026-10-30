@@ -383,11 +383,12 @@ impl App {
         self.status = self.tr("Afbeelding geopend", "Image opened").into();
     }
     fn apply_text(&mut self) {
-        let Some(draft) = self.text_box.take() else {
+        let Some(draft) = self.text_box.as_ref() else {
             return;
         };
         let text = draft.content.text().trim_end_matches('\n').to_owned();
         if text.trim().is_empty() {
+            self.text_box = None;
             return;
         }
         let mut op = draft
@@ -410,6 +411,9 @@ impl App {
         } else {
             self.editor.add(op)
         };
+        if result.is_ok() {
+            self.text_box = None;
+        }
         self.changed(result);
     }
     fn update_inner(&mut self, message: Msg) -> Task<Msg> {
@@ -537,6 +541,8 @@ impl App {
                 }
             }
             Msg::Saved(result, save) => {
+                #[cfg(target_arch = "wasm32")]
+                web::focus_canvas();
                 self.busy = false;
                 match result {
                     Ok(true) => {
