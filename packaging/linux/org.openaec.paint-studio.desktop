@@ -6,4 +6,4 @@ Exec=openaec-paint-studio %f
 Icon=org.openaec.paint-studio
 Terminal=false
 Categories=Graphics;RasterGraphics;2DGraphics;
-MimeType=image/png;image/jpeg;image/webp;image/gif;image/bmp;image/tiff;image/svg+xml;image/heic;image/heif;image/avif;image/vnd.adobe.photoshop;image/jxl;image/jp2;image/x-tga;image/x-exr;application/x-ifcx;application/x-ifcxb;
+MimeType=image/png;image/jpeg;image/webp;image/gif;image/bmp;image/tiff;image/svg+xml;image/heic;image/heif;image/avif;image/vnd.adobe.photoshop;image/jxl;image/jp2;image/x-tga;image/x-exr;application/x-ifcx;application/x-ifcxb;image/x-jp2-codestream;image/jpx;image/x-dds;image/x-adobe-dng;image/x-canon-cr2;image/x-canon-cr3;image/x-fuji-raf;image/x-kodak-dcr;image/x-kodak-kdc;image/x-nikon-nef;image/x-nikon-nrw;image/x-olympus-orf;image/x-panasonic-rw;image/x-panasonic-rw2;image/x-pentax-pef;image/x-sony-sr2;image/x-sony-arw;image/apng;image/svg+xml-compressed;image/vnd.microsoft.icon;image/x-portable-anymap;image/x-portable-bitmap;image/x-portable-graymap;image/x-portable-pixmap;image/qoi;image/x-ms-bmp;image/x-icon;image/x-photoshop;image/heic-sequence;image/heif-sequence;
