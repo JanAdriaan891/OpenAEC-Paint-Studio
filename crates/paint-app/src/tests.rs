@@ -381,3 +381,17 @@ fn atomic_save_replaces_only_a_complete_file_and_cleans_failed_temporary_files()
     assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 2);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn recovered_draft_requires_portable_save_and_late_recovery_cannot_replace_an_opened_file() {
+    let mut app = App::with_document(Document::default());
+    let recovered = example().editor.document;
+    let _ = app.update(Msg::DraftLoaded(Ok(Some(recovered.clone()))));
+    assert_eq!(app.editor.document, recovered);
+    assert!(app.editor.dirty);
+    let mut opened = App::with_document(Document::new(80, 60, "Opened file"));
+    opened.draft_generation = 1;
+    let before = opened.editor.document.clone();
+    let _ = opened.update(Msg::DraftLoaded(Ok(Some(recovered))));
+    assert_eq!(opened.editor.document, before);
+}

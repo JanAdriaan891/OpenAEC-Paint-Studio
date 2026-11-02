@@ -54,7 +54,7 @@ IFCX saves contain the visible **raster image**, using the OpenAEC raster extens
 
 ## Measurements
 
-Run `python3 scripts/benchmark.py` for five isolated release-mode samples per input size. [Method and platform acceptance](docs/BENCHMARKING.md) distinguish measured results from untested competitor and human-task claims.
+Run `python3 scripts/benchmark.py` for five isolated release-mode samples per input size. [Measurements and priorities](docs/benchmarks/2026-11-02.md) and the [method and platform acceptance](docs/BENCHMARKING.md) distinguish measured results from untested competitor and human-task claims.
 
 ## Blueprint and licensing
 

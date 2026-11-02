@@ -190,7 +190,11 @@ pub struct App {
 }
 impl Default for App {
     fn default() -> Self {
-        Self::with_document(platform::draft().unwrap_or_default())
+        let draft = platform::draft();
+        let recovered = draft.is_some();
+        let mut app = Self::with_document(draft.unwrap_or_default());
+        app.editor.dirty = recovered;
+        app
     }
 }
 impl App {
@@ -504,7 +508,10 @@ impl App {
                 }
             }
             Msg::DraftLoaded(result) => match result {
-                Ok(Some(doc)) if !self.editor.dirty => self.load(doc),
+                Ok(Some(doc)) if !self.editor.dirty && self.draft_generation == 0 => {
+                    self.load(doc);
+                    self.editor.dirty = true;
+                }
                 Err(e) => self.status = format!("Concept kon niet worden hersteld: {e}"),
                 _ => {}
             },
