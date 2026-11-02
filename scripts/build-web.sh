@@ -13,4 +13,5 @@ OUTPUT="${PAINT_WEB_OUT:-web-dist}"
 mkdir -p "$OUTPUT/pkg"
 "$BINDGEN" target/wasm32-unknown-unknown/release/openaec_paint_studio.wasm --target web --out-dir "$OUTPUT/pkg"
 cp web/index.html "$OUTPUT/index.html"
+python3 scripts/web-assets.py "$OUTPUT"
 printf '%s\n' 'Ready: python3 -m http.server 3020 --bind 127.0.0.1 --directory web-dist'

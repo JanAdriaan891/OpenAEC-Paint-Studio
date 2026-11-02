@@ -172,6 +172,7 @@ jobs:
           mkdir -p web-dist/pkg artifacts/releases
           /tmp/wasm-bindgen-0.2.130-x86_64-unknown-linux-musl/wasm-bindgen target/wasm32-unknown-unknown/release/openaec_paint_studio.wasm --target web --out-dir web-dist/pkg
           cp web/index.html web-dist/index.html
+          python3 scripts/web-assets.py web-dist
       - uses: actions/setup-node@v4
         with:
           node-version: 24
