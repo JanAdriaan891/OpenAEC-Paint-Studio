@@ -1,6 +1,6 @@
 # OpenAEC Paint Studio
 
-A simple MS Paint inspired image editor, written in **Rust**. The native desktop editor and browser preview share the same image engine and iced UI. Version **2026.44.0** uses the current OpenAEC Blueprint library.
+A simple MS Paint inspired image editor, written in **Rust**. The native desktop editor and browser preview share the same image engine and iced UI. Development version **2026.45.0** builds on release 2026.44.0 and the OpenAEC Blueprint library.
 
 [Download installers](https://github.com/JanAdriaan891/OpenAEC-Paint-Studio/releases/latest) · [Builds and signing](docs/RELEASING.md) · [API](docs/API.md) · [MCP](docs/MCP.md)
 
@@ -12,7 +12,10 @@ A simple MS Paint inspired image editor, written in **Rust**. The native desktop
 - Keep vector objects to select, move, resize, restyle and export them as SVG. Ctrl+A selects all objects; Escape returns to selection mode.
 - Crop, resize, rotate, mirror, grayscale, invert, sepia, brightness, contrast and saturation.
 - Open common images, HEIC, AVIF, PSD, JPEG XL, JPEG 2000 and supported camera RAW files. The default open dialog filters images; IFCX has its own command. [Supported formats and limits](docs/IMAGE-FORMATS.md).
-- Save a raster snapshot as IFCX/IFCXB, or export PNG, JPEG, lossless WebP and SVG. No `.oapaint` format.
+- Save/reopen editable `*.paint.json` projects with Ctrl+S / Ctrl+Shift+O; text, shapes, images and transforms survive reopening. Export raster snapshots as IFCX/IFCXB, PNG, JPEG or lossless WebP, and retained geometry as SVG. No `.oapaint` format.
+- Paste screenshots with Ctrl/Cmd+V and copy the canvas with Ctrl/Cmd+C. Rectangular Pixels mode can move, delete, copy and cut a pixel region, with an explicit flattening explanation and undo.
+- Shift+click or use the object list/F6 dialog to select a subset, then align text/shapes in six directions. The [object/layer design](docs/design/PROJECTS-AND-OBJECTS.md) documents the next steps for visibility, locking and ordering.
+- Large imports show original/result dimensions before replacement, with Continue/Cancel. Existing decoder and canvas limits remain intact.
 - Undo/redo, Ctrl+wheel zoom, middle-button pan, grid, local draft recovery and five Blueprint themes. Dutch/English interface.
 - Rust REST API and MCP stdio executables use the same renderer and document model. No Node runtime is needed for the editor or services.
 
@@ -47,7 +50,11 @@ Browser interaction tests use Playwright as a development dependency: `pnpm inst
 
 The API listens on `127.0.0.1:47831` and creates a private `.paint-data/token`. Enter the token in the editor's API dialog to explicitly send or retrieve a document. Revision checks prevent stale edits from overwriting newer ones. API and MCP do not start automatically with the editor.
 
-IFCX saves contain the visible **raster image**, using the OpenAEC raster extension, rather than the editable scene. Browser drafts retain editable operations in the existing IndexedDB database; native Rust drafts use the platform's application data directory. Keep an export or backup for important work. See [IFCX](docs/IFCX.md).
+IFCX saves contain the visible **raster image**, using the OpenAEC raster extension, rather than the editable scene. Browser drafts retain editable operations in the existing IndexedDB database; native Rust drafts use the platform's application data directory. Save a portable project for work you need to continue editing. See [IFCX](docs/IFCX.md) and [project storage](docs/design/PROJECTS-AND-OBJECTS.md).
+
+## Measurements
+
+Run `python3 scripts/benchmark.py` for five isolated release-mode samples per input size. [Method and platform acceptance](docs/BENCHMARKING.md) distinguish measured results from untested competitor and human-task claims.
 
 ## Blueprint and licensing
 

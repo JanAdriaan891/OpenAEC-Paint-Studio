@@ -133,8 +133,10 @@ pub async fn load_web_draft() -> Result<Option<Document>, String> {
 }
 
 pub type OpenResult = Result<Option<(String, Vec<u8>)>, String>;
-pub async fn open(ifcx: bool) -> OpenResult {
-    let dialog = if ifcx {
+pub async fn open(kind: u8) -> OpenResult {
+    let dialog = if kind == 2 {
+        rfd::AsyncFileDialog::new().add_filter("Paint project (*.paint.json)", &["json"])
+    } else if kind == 1 {
         rfd::AsyncFileDialog::new().add_filter("IFCX raster", &["ifcx", "ifcxb"])
     } else {
         rfd::AsyncFileDialog::new().add_filter("Afbeeldingen", paint_core::codec::IMAGE_EXTENSIONS)
@@ -180,17 +182,36 @@ pub async fn open(ifcx: bool) -> OpenResult {
 }
 pub async fn save(doc: Document, extension: &'static str) -> Result<bool, String> {
     let name = format!("{}.{}", doc.name, extension);
-    let Some(file) = rfd::AsyncFileDialog::new()
-        .set_file_name(name)
-        .add_filter(extension, &[extension])
-        .save_file()
-        .await
-    else {
-        return Ok(false);
-    };
-    let bytes = paint_core::codec::export_image(&doc, extension).map_err(|e| e.to_string())?;
-    file.write(&bytes).await.map_err(|e| e.to_string())?;
-    Ok(true)
+    let bytes = if extension == "paint.json" {
+        paint_core::project::write(&doc)
+    } else {
+        paint_core::codec::export_image(&doc, extension)
+    }
+    .map_err(|e| e.to_string())?;
+    #[cfg(target_arch = "wasm32")]
+    {
+        crate::web::save_download(&bytes, &name).await
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let Some(file) = rfd::AsyncFileDialog::new()
+            .set_file_name(name)
+            .add_filter(
+                extension,
+                &[if extension == "paint.json" {
+                    "json"
+                } else {
+                    extension
+                }],
+            )
+            .save_file()
+            .await
+        else {
+            return Ok(false);
+        };
+        atomic_write(file.path(), &bytes).map_err(|e| e.to_string())?;
+        Ok(true)
+    }
 }
 pub async fn api(
     base: String,
@@ -239,4 +260,24 @@ pub async fn api(
         return Err(value["error"].as_str().unwrap_or("API error").into());
     }
     Ok(value)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn atomic_write(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let temp = path.with_file_name(format!(".paint-{}.tmp", uuid::Uuid::new_v4()));
+    let result = (|| {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        std::fs::rename(&temp, path)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    result
 }

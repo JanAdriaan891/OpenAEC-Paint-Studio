@@ -16,6 +16,7 @@ pub enum Tool {
     Ellipse,
     Text,
     Select,
+    Pixels,
     Crop,
 }
 impl Tool {
@@ -166,6 +167,62 @@ impl Editor {
         self.commit(next)?;
         self.selection.clear();
         Ok(())
+    }
+    pub fn align(&mut self, alignment: Align) -> Result<()> {
+        ensure!(
+            self.document.retain_vectors,
+            "Enable Keep vectors before aligning objects"
+        );
+        ensure!(
+            self.selection.len() >= 2,
+            "Select at least two text or shape objects"
+        );
+        let mut indices = self.selection.clone();
+        indices.sort_unstable();
+        indices.dedup();
+        ensure!(indices.len() >= 2, "Select at least two different objects");
+        let mut objects = Vec::new();
+        for &i in &indices {
+            let op = self
+                .document
+                .operations
+                .get(i)
+                .ok_or_else(|| anyhow::anyhow!("Invalid selection"))?;
+            ensure!(
+                matches!(
+                    op.kind,
+                    Kind::Text | Kind::Line | Kind::Rectangle | Kind::Ellipse
+                ),
+                "Alignment supports text and shapes"
+            );
+            objects.push((
+                i,
+                op.bounds(self.document.size())
+                    .ok_or_else(|| anyhow::anyhow!("Object has no bounds"))?,
+            ));
+        }
+        let reference = objects
+            .iter()
+            .map(|(_, b)| *b)
+            .reduce(Bounds::union)
+            .unwrap();
+        let mut next = self.document.clone();
+        for (i, b) in objects {
+            let (dx, dy) = match alignment {
+                Align::Left => (reference.x - b.x, 0.),
+                Align::Center => (reference.x + reference.width / 2. - b.x - b.width / 2., 0.),
+                Align::Right => (reference.x + reference.width - b.x - b.width, 0.),
+                Align::Top => (0., reference.y - b.y),
+                Align::Middle => (
+                    0.,
+                    reference.y + reference.height / 2. - b.y - b.height / 2.,
+                ),
+                Align::Bottom => (0., reference.y + reference.height - b.y - b.height),
+            };
+            next.operations[i] =
+                next.operations[i].transformed([1., 0., 0., 1., dx, dy], next.size());
+        }
+        self.commit(next)
     }
     pub fn replace_selected(&mut self, op: Operation) -> Result<()> {
         ensure!(self.selection.len() == 1, "Select one object");
@@ -409,4 +466,14 @@ pub fn svg(doc: &Document) -> Result<String> {
     }
     out += "</svg>";
     Ok(out)
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Align {
+    Left,
+    Center,
+    Right,
+    Top,
+    Middle,
+    Bottom,
 }

@@ -29,12 +29,13 @@ rfd = { version = "0.16", default-features = false, features = ["xdg-portal", "a
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 directories = "6"
+arboard = { version = "=3.7.0", features = ["wayland-data-control"] }
 iced = { version = "=0.14.0", default-features = false, features = ["tokio"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
-web-sys = { version = "0.3", features = ["Window", "Storage", "Document", "Element", "HtmlCanvasElement", "Event", "WheelEvent", "EventTarget", "AddEventListenerOptions", "Blob", "ImageBitmap", "CanvasRenderingContext2d"] }
+web-sys = { version = "0.3", features = ["Window", "Storage", "Document", "Element", "HtmlCanvasElement", "Event", "WheelEvent", "EventTarget", "AddEventListenerOptions", "Blob", "ImageBitmap", "CanvasRenderingContext2d", "Navigator", "Clipboard", "ClipboardItem", "BlobPropertyBag", "HtmlAnchorElement", "HtmlElement", "Url", "KeyboardEvent"] }
 console_error_panic_hook = "0.1"
 js-sys = "0.3"
 rayon = "1"

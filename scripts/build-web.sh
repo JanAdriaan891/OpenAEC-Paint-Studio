@@ -9,7 +9,8 @@ if ! command -v "$BINDGEN" >/dev/null; then
 fi
 [[ "$("$BINDGEN" --version)" == "wasm-bindgen 0.2.130" ]] || { echo 'wasm-bindgen CLI 0.2.130 is required' >&2; exit 1; }
 cargo build -p openaec-paint-studio --lib --locked --release --target wasm32-unknown-unknown --features web
-mkdir -p web-dist/pkg
-"$BINDGEN" target/wasm32-unknown-unknown/release/openaec_paint_studio.wasm --target web --out-dir web-dist/pkg
-cp web/index.html web-dist/index.html
+OUTPUT="${PAINT_WEB_OUT:-web-dist}"
+mkdir -p "$OUTPUT/pkg"
+"$BINDGEN" target/wasm32-unknown-unknown/release/openaec_paint_studio.wasm --target web --out-dir "$OUTPUT/pkg"
+cp web/index.html "$OUTPUT/index.html"
 printf '%s\n' 'Ready: python3 -m http.server 3020 --bind 127.0.0.1 --directory web-dist'

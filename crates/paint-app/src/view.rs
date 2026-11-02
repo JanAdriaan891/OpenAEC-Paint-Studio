@@ -127,7 +127,7 @@ pub fn view(app: &App) -> Element<'_, Msg> {
             w::body(
                 look,
                 format!(
-                    "{}.ifcx{}",
+                    "{}.paint.json{}",
                     app.editor.document.name,
                     if app.editor.dirty { "  •" } else { "" }
                 )
@@ -295,10 +295,10 @@ fn group(app: &App, index: usize, mode: Mode) -> Element<'_, Msg> {
                         i::SAVE,
                         30.,
                         false,
-                        "IFCX opslaan",
+                        "Project opslaan",
                         Some(Msg::Command(Command::Save))
                     ),
-                    w::body(look, app.tr("IFCX opslaan", "Save IFCX")),
+                    w::body(look, app.tr("Project opslaan", "Save project")),
                     tooltip::Position::Bottom
                 )
             ]
@@ -327,9 +327,21 @@ fn group(app: &App, index: usize, mode: Mode) -> Element<'_, Msg> {
                     ),
                     w::body(look, app.tr("Exporteren", "Export")),
                     tooltip::Position::Bottom
+                ),
+                tooltip(
+                    w::icon_button(
+                        look,
+                        i::COPY,
+                        22.,
+                        false,
+                        "Klembord",
+                        Some(Msg::Menu(Some(7)))
+                    ),
+                    w::body(look, app.tr("Klembord", "Clipboard")),
+                    tooltip::Position::Bottom
                 )
             ]
-            .spacing(8);
+            .spacing(6);
             column![first, second].spacing(5).into()
         }
         1 => {
@@ -582,7 +594,7 @@ fn inspector(app: &App) -> Element<'_, Msg> {
                 app.editor.document.width, app.editor.document.height
             )
         ),
-        w::secondary(look, app.tr("Geschiedenis", "History"))
+        w::secondary(look, app.tr("Objecten", "Objects"))
     ]
     .spacing(14);
     if app.editor.document.operations.is_empty() {
@@ -591,15 +603,7 @@ fn inspector(app: &App) -> Element<'_, Msg> {
             app.tr("Begin met tekenen", "Start drawing"),
         ));
     }
-    for (index, op) in app
-        .editor
-        .document
-        .operations
-        .iter()
-        .enumerate()
-        .rev()
-        .take(40)
-    {
+    for (index, op) in app.editor.document.operations.iter().enumerate().rev() {
         let label = match op.kind {
             Kind::Brush => app.tr("Penseel", "Brush"),
             Kind::Eraser => app.tr("Gum", "Eraser"),
@@ -610,12 +614,31 @@ fn inspector(app: &App) -> Element<'_, Msg> {
             Kind::Text => app.tr("Tekst", "Text"),
             Kind::Image => app.tr("Afbeelding", "Image"),
         };
-        items = items.push(
-            container(w::body(look, format!("{:02}  {label}", index + 1)))
-                .padding([9, 8])
-                .width(Length::Fill),
-        );
+        items = items.push(focus::focusable(
+            look,
+            iced::widget::checkbox(app.editor.selection.contains(&index))
+                .label(format!("{:02}  {label}", index + 1))
+                .on_toggle(move |_| Msg::SelectObject(index))
+                .size(16)
+                .text_size(12),
+            true,
+            3.,
+        ));
     }
+    let items = column![
+        simple(
+            app,
+            app.tr("Objecten… · F6", "Objects… · F6"),
+            Command::Objects
+        ),
+        w::secondary(
+            look,
+            app.tr("Meerdere: Shift+klik", "Multiple: Shift+click")
+        ),
+        alignment(app),
+        items
+    ]
+    .spacing(10);
     container(scrollable(items))
         .width(230)
         .height(Length::Fill)
@@ -633,7 +656,9 @@ fn inspector(app: &App) -> Element<'_, Msg> {
 }
 fn popup(app: &App, index: usize) -> Element<'_, Msg> {
     let look = app.look();
-    let title = if index == 6 {
+    let title = if index == 7 {
+        app.tr("Klembord", "Clipboard")
+    } else if index == 6 {
         app.tr("Exporteren", "Export")
     } else {
         app.tr(LABELS[index].0, LABELS[index].1)
@@ -647,9 +672,15 @@ fn popup(app: &App, index: usize) -> Element<'_, Msg> {
         0 => {
             for (nl, en, icon, cmd) in [
                 ("Open afbeelding", "Open image", i::OPEN, Command::Open),
+                (
+                    "Project openen",
+                    "Open project",
+                    i::OPEN,
+                    Command::OpenProject,
+                ),
                 ("IFCX openen", "Open IFCX", i::OPEN, Command::OpenIfcx),
                 ("Nieuw canvas", "New canvas", i::NEW, Command::New),
-                ("IFCX opslaan", "Save IFCX", i::SAVE, Command::Save),
+                ("Project opslaan", "Save project", i::SAVE, Command::Save),
             ] {
                 content = content.push(action(app, app.tr(nl, en), icon, cmd));
             }
@@ -658,6 +689,14 @@ fn popup(app: &App, index: usize) -> Element<'_, Msg> {
             }
         }
         1 => {
+            content = content.push(clipboard_actions(app));
+            content = content.push(w::ribbon_small(
+                look,
+                i::SELECT,
+                app.tr("Pixels selecteren…", "Select pixels…"),
+                false,
+                Some(Msg::Tool(Tool::Pixels)),
+            ));
             for (tool, nl, en, icon) in TOOLS {
                 content = content.push(w::ribbon_small(
                     look,
@@ -676,6 +715,13 @@ fn popup(app: &App, index: usize) -> Element<'_, Msg> {
         }
         2 => {
             content = content.push(properties(app, false));
+            content = content.push(simple(
+                app,
+                app.tr("Objecten en uitlijnen…", "Objects and alignment…"),
+                Command::Objects,
+            ));
+            content = content.push(alignment(app));
+            content = content.push(clipboard_actions(app));
             if app.editor.selection.len() == 1 {
                 let op = &app.editor.document.operations[app.editor.selection[0]];
                 if op.kind == Kind::Text {
@@ -717,6 +763,18 @@ fn popup(app: &App, index: usize) -> Element<'_, Msg> {
         }
         3 => content = content.push(palette(app, 30)),
         4 => {
+            content = content.push(w::ribbon_small(
+                look,
+                i::SELECT,
+                app.tr("Pixels selecteren…", "Select pixels…"),
+                false,
+                Some(Msg::Tool(Tool::Pixels)),
+            ));
+            content = content.push(simple(
+                app,
+                app.tr("Objecten en uitlijnen…", "Objects and alignment…"),
+                Command::Objects,
+            ));
             for (nl, en, icon, cmd) in [
                 ("Formaat wijzigen", "Resize", i::IMAGE, Command::Resize),
                 (
@@ -786,6 +844,11 @@ fn popup(app: &App, index: usize) -> Element<'_, Msg> {
                 ));
         }
         5 => {
+            content = content.push(simple(
+                app,
+                app.tr("Objecten en uitlijnen…", "Objects and alignment…"),
+                Command::Objects,
+            ));
             for (nl, en, icon, cmd) in [
                 ("Passend maken", "Fit", i::FIT, Command::Fit),
                 (
@@ -808,6 +871,18 @@ fn popup(app: &App, index: usize) -> Element<'_, Msg> {
                 content = content.push(action(app, app.tr(nl, en), icon, cmd));
             }
         }
+        7 => {
+            content = content.push(clipboard_actions(app));
+            content = content.push(simple(
+                app,
+                app.tr("Pixelgebied knippen", "Cut pixel selection"),
+                Command::Cut,
+            ));
+            content = content.push(w::secondary(
+                look,
+                app.tr("Ctrl/Cmd+C · V · X", "Ctrl/Cmd+C · V · X"),
+            ));
+        }
         6 => {
             for ext in ["png", "jpeg", "webp", "svg", "ifcx", "ifcxb"] {
                 content = content.push(simple(app, ext, Command::Export(ext)));
@@ -816,7 +891,7 @@ fn popup(app: &App, index: usize) -> Element<'_, Msg> {
         _ => {}
     }
     let height = if index == 0 {
-        390.
+        440.
     } else if matches!(index, 1 | 4) {
         370.
     } else {
@@ -903,13 +978,88 @@ fn dialog(app: &App, which: Dialog) -> Element<'_, Msg> {
         Some(Msg::Dialog(None)),
     )];
     let (title, content): (&str, Element<'_, Msg>) = match which {
+        Dialog::ImportResize => {
+            let info = app.pending_import.as_ref();
+            let message = info
+                .map(|i| {
+                    format!(
+                        "{} × {} px → {} × {} px",
+                        i.original.width, i.original.height, i.document.width, i.document.height
+                    )
+                })
+                .unwrap_or_default();
+            actions.push(w::button(
+                look,
+                app.tr("Doorgaan", "Continue"),
+                K::Primary,
+                D::Regular,
+                None,
+                Some(Msg::AcceptImport),
+            ));
+            (app.tr("Afbeelding verkleinen?", "Resize imported image?"),column![
+                w::body(look,message),w::body(look,app.tr("Deze afbeelding wordt verkleind tot de canvaslimieten. Bij annuleren blijft je huidige werk behouden.", "This image will be reduced to the canvas limits. Cancel keeps your current work."))
+            ].spacing(10).into())
+        }
+        Dialog::PixelMode => {
+            actions.push(w::button(
+                look,
+                app.tr("Pixels selecteren", "Select pixels"),
+                K::Primary,
+                D::Regular,
+                None,
+                Some(Msg::PixelMode),
+            ));
+            (app.tr("Pixels uit de compositie", "Pixels from the composition"),w::body(look,app.tr("Sleep een rechthoek; sleep daarna binnen de selectie om te verplaatsen. Delete verwijdert pixels, Ctrl+X knipt. Verplaatsen of verwijderen maakt één raster van alle objecten. Undo herstelt de objecten. Vrijgekomen pixels tonen de achtergrond. Escape heft de selectie op.", "Drag a rectangle, then drag inside it to move. Delete removes pixels; Ctrl+X cuts. Moving or deleting flattens all objects into one raster. Undo restores the objects. Cleared pixels reveal the background. Escape cancels the selection.")).into())
+        }
+        Dialog::Objects => {
+            let mut objects = column![
+                w::body(
+                    look,
+                    app.tr(
+                        "Vink tekst en vormen aan om een subset uit te lijnen.",
+                        "Check text and shapes to align a subset."
+                    )
+                ),
+                alignment(app)
+            ]
+            .spacing(8);
+            for (index, op) in app.editor.document.operations.iter().enumerate().rev() {
+                let summary = op
+                    .text
+                    .as_deref()
+                    .map(|t| t.chars().take(28).collect::<String>())
+                    .unwrap_or_else(|| format!("{:?}", op.kind));
+                objects = objects.push(focus::focusable(
+                    look,
+                    iced::widget::checkbox(app.editor.selection.contains(&index))
+                        .label(format!("{} · {}", index + 1, summary))
+                        .on_toggle(move |_| Msg::SelectObject(index))
+                        .size(16)
+                        .text_size(12),
+                    true,
+                    3.,
+                ));
+            }
+            (
+                app.tr("Objecten en uitlijnen", "Objects and alignment"),
+                scrollable(objects).height(300).into(),
+            )
+        }
         Dialog::Settings => {
             let content = column![
                 w::secondary(look, app.tr("Thema", "Theme")),
                 pick_list(ThemeId::ALL, Some(app.settings.theme), Msg::Theme),
                 w::checkbox(look, "English", app.settings.english, Some(Msg::English)),
                 w::heading(look, app.tr("Sneltoetsen", "Shortcuts"), 14.),
-                w::body(look, "Ctrl+A · Select all    Ctrl+S · Save IFCX"),
+                w::body(look, "Ctrl+A · Select all    Ctrl+S · Save project"),
+                w::body(
+                    look,
+                    "Ctrl+C / V · Copy / Paste    Ctrl+Shift+O · Open project"
+                ),
+                w::body(
+                    look,
+                    "F6 · Objects    P · Pixels    Shift+click · Multiple objects"
+                ),
                 w::body(look, "Ctrl+Z · Undo    Ctrl+Shift+Z · Redo"),
                 w::body(look, "Ctrl+wheel · Zoom    Middle drag · Pan"),
                 w::body(look, "Escape · Select    Delete · Remove objects"),
@@ -1059,7 +1209,7 @@ fn dialog(app: &App, which: Dialog) -> Element<'_, Msg> {
                 None,
                 Some(Msg::Command(Command::Save)),
             ));
-            (app.tr("Wijzigingen opslaan?","Save changes?"),w::body(look,app.tr("Het lokale concept is bewaard. Sla ook een IFCX-bestand op om het te delen.","Your local draft is kept. Save an IFCX file to share the image.")).into())
+            (app.tr("Wijzigingen opslaan?","Save changes?"),w::body(look,app.tr("Het lokale concept is bewaard. Sla ook een projectbestand op om bewerkbaar verder te werken.","Your local draft is kept. Save a project file to keep all objects editable.")).into())
         }
         Dialog::Replace => {
             actions.push(w::button(
@@ -1089,4 +1239,49 @@ fn dialog(app: &App, which: Dialog) -> Element<'_, Msg> {
             false,
         ),
     )
+}
+
+fn clipboard_actions(app: &App) -> Element<'_, Msg> {
+    row![
+        simple(app, app.tr("Kopiëren", "Copy"), Command::Copy),
+        simple(app, app.tr("Plakken", "Paste"), Command::Paste)
+    ]
+    .spacing(6)
+    .into()
+}
+fn alignment(app: &App) -> Element<'_, Msg> {
+    let enabled = app.editor.document.retain_vectors
+        && app.editor.selection.len() >= 2
+        && app.editor.selection.iter().all(|i| {
+            app.editor.document.operations.get(*i).is_some_and(|op| {
+                matches!(
+                    op.kind,
+                    Kind::Text | Kind::Line | Kind::Rectangle | Kind::Ellipse
+                )
+            })
+        });
+    let labels = [
+        ("Links", "Left", Align::Left),
+        ("H. midden", "Center", Align::Center),
+        ("Rechts", "Right", Align::Right),
+        ("Boven", "Top", Align::Top),
+        ("V. midden", "Middle", Align::Middle),
+        ("Onder", "Bottom", Align::Bottom),
+    ];
+    let mut rows = column![].spacing(4);
+    for chunk in labels.chunks(3) {
+        let mut buttons = row![].spacing(3);
+        for (nl, en, align) in chunk {
+            buttons = buttons.push(w::button(
+                app.look(),
+                app.tr(nl, en),
+                K::Secondary,
+                D::Compact,
+                None,
+                enabled.then_some(Msg::Command(Command::Align(*align))),
+            ));
+        }
+        rows = rows.push(buttons);
+    }
+    rows.into()
 }

@@ -4,7 +4,7 @@ exclude = ["vendor/openaec-ui", "vendor/avif-decode", "vendor/rawler"]
 resolver = "2"
 
 [workspace.package]
-version = "2026.44.0"
+version = "2026.45.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/JanAdriaan891/OpenAEC-Paint-Studio"

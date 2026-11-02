@@ -28,12 +28,15 @@ pub fn render_transparent(doc: &Document) -> Result<Pixmap> {
 }
 pub fn render(doc: &Document) -> Result<Pixmap> {
     let layer = render_transparent(doc)?;
-    if doc.background == "transparent" {
+    with_background(layer, &doc.background)
+}
+pub fn with_background(layer: Pixmap, background: &str) -> Result<Pixmap> {
+    if background == "transparent" {
         return Ok(layer);
     }
-    let c = parse_color(&doc.background)?;
-    let mut out =
-        Pixmap::new(doc.width, doc.height).ok_or_else(|| anyhow!("Canvas allocation failed"))?;
+    let c = parse_color(background)?;
+    let mut out = Pixmap::new(layer.width(), layer.height())
+        .ok_or_else(|| anyhow!("Canvas allocation failed"))?;
     out.fill(tiny_skia::Color::from_rgba8(c[0], c[1], c[2], 255));
     out.draw_pixmap(
         0,

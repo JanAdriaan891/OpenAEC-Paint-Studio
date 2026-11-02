@@ -33,7 +33,7 @@ jobs:
         run: |
           curl --fail --location --retry 3 https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -o /tmp/linuxdeploy.AppImage
           chmod +x /tmp/linuxdeploy.AppImage
-          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 OUTPUT="$PWD/artifacts/releases/OpenAEC-Paint-Studio_2026.44.0_x86_64.AppImage" /tmp/linuxdeploy.AppImage --appdir 'artifacts/releases/OpenAEC Paint Studio.AppDir' --library /usr/lib/x86_64-linux-gnu/libxkbcommon-x11.so.0 --library /usr/lib/x86_64-linux-gnu/libxkbcommon.so.0 --output appimage
+          APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 OUTPUT="$PWD/artifacts/releases/OpenAEC-Paint-Studio_2026.45.0_x86_64.AppImage" /tmp/linuxdeploy.AppImage --appdir 'artifacts/releases/OpenAEC Paint Studio.AppDir' --library /usr/lib/x86_64-linux-gnu/libxkbcommon-x11.so.0 --library /usr/lib/x86_64-linux-gnu/libxkbcommon.so.0 --output appimage
       - name: Validate package contents and image associations
         run: |
           dpkg-deb --info artifacts/releases/*.deb
@@ -184,7 +184,8 @@ jobs:
         run: |
           python3 -m http.server 49325 --bind 127.0.0.1 --directory web-dist >/tmp/paint-web.log 2>&1 &
           node tests/web-smoke.mjs
-      - run: tar -czf artifacts/releases/OpenAEC-Paint-Studio_2026.44.0_web.tar.gz -C web-dist .
+          node tests/web-workflows.mjs
+      - run: tar -czf artifacts/releases/OpenAEC-Paint-Studio_2026.45.0_web.tar.gz -C web-dist .
       - uses: actions/upload-artifact@v4
         with:
           name: web-release
@@ -208,7 +209,7 @@ jobs:
           cp /tmp/paint-vendor-config artifacts/source/.cargo/config.toml
           # cargo vendor prints a repository-relative path. The archive builds from its own root.
           sed -i 's|artifacts/source/vendor-crates|vendor-crates|' artifacts/source/.cargo/config.toml
-          tar -czf artifacts/releases/OpenAEC-Paint-Studio_2026.44.0_source.tar.gz -C artifacts/source .
+          tar -czf artifacts/releases/OpenAEC-Paint-Studio_2026.45.0_source.tar.gz -C artifacts/source .
       - uses: actions/upload-artifact@v4
         with:
           name: source-release

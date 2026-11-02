@@ -228,3 +228,156 @@ fn text_that_exceeds_document_limits_remains_available_for_correction() {
         text
     );
 }
+
+#[test]
+fn cancelling_resized_import_preserves_document_dirty_and_draft() {
+    let mut app = example();
+    app.editor.dirty = true;
+    let before = app.editor.document.clone();
+    app.pending_import = Some(paint_core::codec::ImageImport {
+        document: Document::new(100, 100, "Other"),
+        original: paint_core::Size {
+            width: 6000,
+            height: 4000,
+        },
+    });
+    app.dialog = Some(Dialog::ImportResize);
+    let _ = app.update(Msg::Dialog(None));
+    assert_eq!(app.editor.document, before);
+    assert!(app.editor.dirty);
+    assert!(app.pending_draft.is_none());
+    assert!(app.pending_import.is_none());
+}
+#[test]
+fn save_and_clipboard_failures_never_clear_dirty_or_replace_work() {
+    let mut app = example();
+    app.editor.dirty = true;
+    let before = app.editor.document.clone();
+    let _ = app.update(Msg::Saved(Ok(false), Some(before.clone())));
+    assert!(app.editor.dirty);
+    let _ = app.update(Msg::Saved(Err("disk full".into()), Some(before.clone())));
+    assert!(app.editor.dirty);
+    let _ = app.update(Msg::Saved(Ok(true), None));
+    assert!(app.editor.dirty, "export is not project save");
+    let mut older = before.clone();
+    older.name = "Older".into();
+    let _ = app.update(Msg::Saved(Ok(true), Some(older)));
+    assert!(
+        app.editor.dirty,
+        "a stale save cannot mark new changes saved"
+    );
+    let _ = app.update(Msg::ClipboardRead(Err("denied".into())));
+    let _ = app.update(Msg::ClipboardWritten(
+        Err("denied".into()),
+        Some(Document::default()),
+    ));
+    assert_eq!(app.editor.document, before);
+    assert!(app.editor.dirty);
+    let _ = app.update(Msg::Saved(Ok(true), Some(before)));
+    assert!(!app.editor.dirty);
+}
+#[test]
+fn paste_adds_movable_image_and_is_one_undo_step() {
+    let mut app = example();
+    let before = app.editor.document.clone();
+    let bytes = paint_core::png(&Document::new(40, 30, "Clipboard")).unwrap();
+    let _ = app.update(Msg::ClipboardRead(Ok(bytes)));
+    assert_eq!(app.tool, Tool::Select);
+    assert_eq!(
+        app.editor.document.operations.len(),
+        before.operations.len() + 1
+    );
+    let image = app.editor.document.operations.last().unwrap();
+    assert_eq!(image.kind, Kind::Image);
+    assert!(image.transform.is_some());
+    let _ = app.update(Msg::Command(Command::Undo));
+    assert_eq!(app.editor.document, before);
+}
+#[test]
+fn pixel_selection_escape_and_edit_restore_vectors_with_undo() {
+    let mut app = example();
+    let before = app.editor.document.clone();
+    let _ = app.update(Msg::Tool(Tool::Pixels));
+    assert_eq!(app.dialog, Some(Dialog::PixelMode));
+    let _ = app.update(Msg::PixelMode);
+    assert_eq!(app.tool, Tool::Pixels);
+    app.pixel_selection = Some(paint_core::selection::PixelRect {
+        x: 170,
+        y: 160,
+        width: 100,
+        height: 100,
+    });
+    let _ = app.update(Msg::Command(Command::Delete));
+    assert_eq!(app.editor.document.operations.len(), 1);
+    let _ = app.update(Msg::Command(Command::Undo));
+    assert_eq!(app.editor.document, before);
+    let _ = app.update(Msg::Command(Command::Cancel));
+    assert_eq!(app.tool, Tool::Select);
+    assert!(app.pixel_selection.is_none());
+}
+#[test]
+fn new_dialogs_render_at_560px_and_allow_keyboard_object_access() {
+    let mut app = example();
+    app.width = Size::new(560., 800.);
+    app.fit();
+    for dialog in [Dialog::Objects, Dialog::PixelMode, Dialog::ImportResize] {
+        app.dialog = Some(dialog);
+        app.pending_import = Some(paint_core::codec::ImageImport {
+            document: Document::new(3547, 2364, "Large"),
+            original: paint_core::Size {
+                width: 6000,
+                height: 4000,
+            },
+        });
+        let found = accessibility(&app);
+        for n in &found.nodes {
+            assert!(
+                n.bounds.x >= -0.5 && n.bounds.x + n.bounds.width <= 560.5,
+                "{} {:?}",
+                n.node.name,
+                n.bounds
+            );
+        }
+        let image = render(&app, app.width);
+        assert_eq!(image.width(), 560);
+    }
+    app.dialog = None;
+    let _ = app.update(Msg::Key(
+        iced::keyboard::Key::Named(iced::keyboard::key::Named::F6),
+        iced::keyboard::Modifiers::empty(),
+    ));
+    assert_eq!(app.dialog, Some(Dialog::Objects));
+}
+
+#[test]
+fn larger_clipboard_expands_canvas_without_replacing_existing_objects() {
+    let mut app = example();
+    let before = app.editor.document.clone();
+    let bytes = paint_core::png(&Document::new(1600, 900, "Large clipboard")).unwrap();
+    let _ = app.update(Msg::ClipboardRead(Ok(bytes)));
+    assert_eq!(
+        app.editor.document.size(),
+        paint_core::Size {
+            width: 1600,
+            height: 900
+        }
+    );
+    assert_eq!(&app.editor.document.operations[..2], &before.operations[..]);
+    app.editor.undo();
+    assert_eq!(app.editor.document, before);
+}
+#[test]
+fn atomic_save_replaces_only_a_complete_file_and_cleans_failed_temporary_files() {
+    let dir = std::env::temp_dir().join(format!("paint-save-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir(&dir).unwrap();
+    let file = dir.join("work.paint.json");
+    std::fs::write(&file, b"old project").unwrap();
+    platform::atomic_write(&file, b"complete new project").unwrap();
+    assert_eq!(std::fs::read(&file).unwrap(), b"complete new project");
+    let folder = dir.join("existing-directory");
+    std::fs::create_dir(&folder).unwrap();
+    assert!(platform::atomic_write(&folder, b"cannot replace directory").is_err());
+    assert!(folder.is_dir());
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 2);
+    std::fs::remove_dir_all(dir).unwrap();
+}

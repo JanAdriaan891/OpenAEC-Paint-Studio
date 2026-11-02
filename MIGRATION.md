@@ -20,3 +20,7 @@ The Home ribbon automatically expands, compacts and collapses individual groups 
 Windows and Linux installers register Open With support for image formats and IFCX; macOS declares image editor document types. Existing default viewers are preserved. Themes now come from OpenAEC Blueprint 2026.44.1. See [format limits](docs/IMAGE-FORMATS.md) for supported profiles and camera variants.
 
 New source is MIT, with the Blueprint LGPL-3.0 and Rawler LGPL-2.1 components retained under their own licenses. The release includes complete corresponding source, locked dependencies, notices and offline build configuration. Detached Ed25519 signatures are separate from Windows Authenticode and Apple Developer ID/notarization. See [releasing](docs/RELEASING.md) and [validation](docs/VALIDATION.md).
+
+## 2026.45 project storage
+
+Save / Ctrl+S writes editable `*.paint.json` projects. Open them with Open Project / Ctrl+Shift+O. IFCX/IFCXB remain raster exchange formats in Export/Open IFCX. Older IFCX files contain only their original raster; lost object structure cannot be reconstructed from those files. Existing local drafts still preserve the v1 operations and can now be saved as portable projects. [Format and object decisions](docs/design/PROJECTS-AND-OBJECTS.md).
