@@ -1,9 +1,11 @@
 //! Native OpenAEC Paint Studio and its browser build, both authored in Rust.
 mod canvas;
+mod clipboard;
 mod icons;
 #[cfg(target_os = "macos")]
 mod macos;
 mod platform;
+mod text_clipboard;
 mod view;
 #[cfg(target_arch = "wasm32")]
 mod web;
@@ -17,7 +19,7 @@ use openaec_ui::{
     fonts,
 };
 use paint_core::{
-    edit::{self, Editor, Filter, Tool, TransformAction},
+    edit::{self, Align, Editor, Filter, Tool, TransformAction},
     *,
 };
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -30,11 +32,20 @@ pub enum Dialog {
     Api,
     Close,
     Replace,
+    ImportResize,
+    PixelMode,
+    Objects,
 }
 #[derive(Debug, Clone, Copy)]
 pub enum Command {
     Open,
     OpenIfcx,
+    OpenProject,
+    Copy,
+    Cut,
+    Paste,
+    Align(Align),
+    Objects,
     New,
     Save,
     Export(&'static str),
@@ -89,7 +100,12 @@ pub enum Msg {
     Resized(Size),
     Key(iced::keyboard::Key, iced::keyboard::Modifiers),
     Opened(platform::OpenResult),
-    Saved(Result<bool, String>, bool),
+    Saved(Result<bool, String>, Option<Document>),
+    ClipboardRead(Result<Vec<u8>, String>),
+    ClipboardWritten(Result<(), String>, Option<Document>),
+    AcceptImport,
+    PixelMode,
+    SelectObject(usize),
     Launch(std::path::PathBuf),
     CloseWindow,
     Exit,
@@ -115,6 +131,17 @@ pub enum Gesture {
         at: paint_core::Point,
         bounds: Bounds,
         resize: bool,
+    },
+    PixelBox {
+        from: paint_core::Point,
+        to: paint_core::Point,
+    },
+    PixelMove {
+        cache: paint_core::selection::PixelPreview,
+        original: Document,
+        rect: paint_core::selection::PixelRect,
+        at: paint_core::Point,
+        to: paint_core::Point,
     },
     Pan {
         at: Point,
@@ -159,10 +186,16 @@ pub struct App {
     pub api_documents: Vec<serde_json::Value>,
     pub corrections: [f32; 3],
     pub closing_after_save: bool,
+    pub pending_import: Option<paint_core::codec::ImageImport>,
+    pub pixel_selection: Option<paint_core::selection::PixelRect>,
 }
 impl Default for App {
     fn default() -> Self {
-        Self::with_document(platform::draft().unwrap_or_default())
+        let draft = platform::draft();
+        let recovered = draft.is_some();
+        let mut app = Self::with_document(draft.unwrap_or_default());
+        app.editor.dirty = recovered;
+        app
     }
 }
 impl App {
@@ -210,6 +243,8 @@ impl App {
             api_documents: vec![],
             corrections: [0., 0., 100.],
             closing_after_save: false,
+            pending_import: None,
+            pixel_selection: None,
         };
         app.fit();
         app
@@ -322,6 +357,21 @@ impl App {
         self.auto_fit = false;
     }
     pub fn selection_bounds(&self) -> Option<Bounds> {
+        if self.tool == Tool::Pixels {
+            return match &self.gesture {
+                Some(Gesture::PixelBox { from, to }) => {
+                    paint_core::selection::PixelRect::between(&self.editor.document, *from, *to)
+                        .map(|r| r.bounds())
+                }
+                Some(Gesture::PixelMove { rect, at, to, .. }) => {
+                    let mut b = rect.bounds();
+                    b.x += (to.x - at.x).round();
+                    b.y += (to.y - at.y).round();
+                    Some(b)
+                }
+                _ => self.pixel_selection.map(|r| r.bounds()),
+            };
+        }
         if self.tool != Tool::Select {
             return None;
         }
@@ -367,11 +417,16 @@ impl App {
         self.menu = None;
         self.dialog = None;
         self.pending_document = None;
+        self.pending_import = None;
+        self.pixel_selection = None;
+        self.closing_after_save = false;
         self.tool = Tool::Select;
         self.repaint();
     }
     fn load(&mut self, doc: Document) {
         self.editor = Editor::new(doc);
+        self.pixel_selection = None;
+        self.pending_import = None;
         self.preview = None;
         self.gesture = None;
         self.text_box = None;
@@ -381,6 +436,15 @@ impl App {
         self.persist();
         self.repaint();
         self.status = self.tr("Afbeelding geopend", "Image opened").into();
+    }
+    fn offer_document(&mut self, doc: Document) {
+        if self.editor.dirty {
+            self.pending_document = Some(doc);
+            self.dialog = Some(Dialog::Replace);
+        } else {
+            self.dialog = None;
+            self.load(doc);
+        }
     }
     fn apply_text(&mut self) {
         let Some(draft) = self.text_box.as_ref() else {
@@ -417,6 +481,23 @@ impl App {
         self.changed(result);
     }
     fn update_inner(&mut self, message: Msg) -> Task<Msg> {
+        if self.busy
+            && matches!(
+                message,
+                Msg::Vectors(_)
+                    | Msg::SelectObject(_)
+                    | Msg::Apply
+                    | Msg::Tool(_)
+                    | Msg::PixelMode
+                    | Msg::AcceptImport
+                    | Msg::Replace
+                    | Msg::ApiAction(_)
+                    | Msg::Launch(_)
+                    | Msg::CloseWindow
+            )
+        {
+            return Task::none();
+        }
         match message {
             Msg::PollFiles =>
             {
@@ -428,7 +509,10 @@ impl App {
                 }
             }
             Msg::DraftLoaded(result) => match result {
-                Ok(Some(doc)) if !self.editor.dirty => self.load(doc),
+                Ok(Some(doc)) if !self.editor.dirty && self.draft_generation == 0 => {
+                    self.load(doc);
+                    self.editor.dirty = true;
+                }
                 Err(e) => self.status = format!("Concept kon niet worden hersteld: {e}"),
                 _ => {}
             },
@@ -442,10 +526,15 @@ impl App {
             }
             Msg::Modifiers(m) => self.modifiers = m,
             Msg::Command(c) => return self.command(c),
+            Msg::Tool(Tool::Pixels) => {
+                self.dialog = Some(Dialog::PixelMode);
+                self.menu = None;
+            }
             Msg::Tool(tool) => {
                 self.gesture = None;
                 self.preview = None;
                 self.tool = tool;
+                self.pixel_selection = None;
                 self.menu = None;
                 if tool == Tool::Text && self.style.size < 24. {
                     self.style.size = 30.;
@@ -486,6 +575,11 @@ impl App {
             }
             Msg::Menu(m) => self.menu = m,
             Msg::Dialog(d) => {
+                if d.is_none() {
+                    self.pending_import = None;
+                    self.pending_document = None;
+                    self.closing_after_save = false;
+                }
                 self.dialog = d;
                 self.menu = None;
             }
@@ -524,41 +618,128 @@ impl App {
                 web::focus_canvas();
                 self.busy = false;
                 match result {
-                    Ok(Some((name, bytes))) => match paint_core::codec::import_image(&bytes, &name)
-                    {
-                        Ok(doc) => {
-                            if self.editor.dirty {
-                                self.pending_document = Some(doc);
-                                self.dialog = Some(Dialog::Replace);
-                            } else {
-                                self.load(doc);
+                    Ok(Some((name, bytes))) => {
+                        if name.to_ascii_lowercase().ends_with(".json") {
+                            match paint_core::project::read(&bytes) {
+                                Ok(doc) => self.offer_document(doc),
+                                Err(e) => self.status = e.to_string(),
+                            }
+                        } else {
+                            match paint_core::codec::import_image_with_info(&bytes, &name) {
+                                Ok(import) if import.resized() => {
+                                    self.pending_import = Some(import);
+                                    self.dialog = Some(Dialog::ImportResize);
+                                }
+                                Ok(import) => self.offer_document(import.document),
+                                Err(e) => self.status = e.to_string(),
                             }
                         }
-                        Err(e) => self.status = e.to_string(),
-                    },
+                    }
                     Ok(None) => {}
                     Err(e) => self.status = e,
                 }
             }
-            Msg::Saved(result, save) => {
+            Msg::AcceptImport => {
+                if let Some(import) = self.pending_import.take() {
+                    self.dialog = None;
+                    self.offer_document(import.document);
+                }
+            }
+            Msg::PixelMode => {
+                self.dialog = None;
+                self.tool = Tool::Pixels;
+                self.pixel_selection = None;
+                self.editor.selection.clear();
+                self.gesture = None;
+                self.preview = None;
+                self.status = self
+                    .tr(
+                        "Pixels uit de compositie · bewerken vlakt objecten af · Escape heft op",
+                        "Composition pixels · editing flattens objects · Escape cancels",
+                    )
+                    .into();
+                self.repaint();
+            }
+            Msg::SelectObject(index) => {
+                if index < self.editor.document.operations.len() {
+                    self.tool = Tool::Select;
+                    self.pixel_selection = None;
+                    if self.editor.selection.contains(&index) {
+                        self.editor.selection.retain(|i| *i != index);
+                    } else {
+                        self.editor.selection.push(index);
+                    }
+                    self.repaint();
+                }
+            }
+            Msg::Saved(result, snapshot) => {
                 #[cfg(target_arch = "wasm32")]
                 web::focus_canvas();
                 self.busy = false;
+                let saved_current = snapshot
+                    .as_ref()
+                    .is_some_and(|d| *d == self.editor.document);
                 match result {
                     Ok(true) => {
-                        if save {
+                        if saved_current {
                             self.editor.dirty = false;
                         }
-                        self.status = self.tr("Bestand opgeslagen", "File saved").into();
-                        if self.closing_after_save {
+                        self.status = if snapshot.is_some() {
+                            self.tr("Bewerkbaar project opgeslagen", "Editable project saved")
+                        } else {
+                            self.tr(
+                                "Export opgeslagen · bewaar ook het project om verder te bewerken",
+                                "Export saved · also save the project to keep editing",
+                            )
+                        }
+                        .into();
+                        if self.closing_after_save && saved_current {
                             return self.update(Msg::Exit);
                         }
                     }
-                    Ok(false) => self.closing_after_save = false,
-                    Err(e) => {
-                        self.status = e;
-                        self.closing_after_save = false;
+                    Ok(false) => {}
+                    Err(e) => self.status = e,
+                }
+                self.closing_after_save = false;
+            }
+            Msg::ClipboardRead(result) => {
+                self.busy = false;
+                match result {
+                    Ok(bytes) => match paint_core::codec::import_image_with_info(&bytes,"Clipboard.png") {
+                        Ok(import) if !import.resized() => {
+                            let old_size=self.editor.document.size();
+                            let mut doc=self.editor.document.clone();
+                            doc.width=doc.width.max(import.document.width);
+                            doc.height=doc.height.max(import.document.height);
+                            if let Err(e)=validate_dimensions(doc.width,doc.height) { self.status=format!("Klembord: {e}"); return Task::none(); }
+                            for op in &mut doc.operations { if op.kind==Kind::Image && op.source_size.is_none() { op.source_size=Some(old_size); } }
+                            let mut op=import.document.operations[0].clone();
+                            op.transform=Some([1.,0.,0.,1.,(doc.width-import.document.width) as f32/2.,(doc.height-import.document.height) as f32/2.]);
+                            doc.operations.push(op);
+                            let result=self.editor.commit(doc);
+                            if result.is_ok() { self.editor.selection=vec![self.editor.document.operations.len()-1]; }
+                            self.tool=Tool::Select;self.pixel_selection=None;
+                            if self.editor.document.size()!=old_size { self.fit(); }
+                            self.changed(result);
+                        }
+                        Ok(_) => self.status=self.tr("Klembordafbeelding overschrijdt de canvaslimieten. Open als bestand om te verkleinen.", "Clipboard image exceeds canvas limits. Open as a file to resize.").into(),
+                        Err(e) => self.status=e.to_string(),
+                    },
+                    Err(e) => self.status=e,
+                }
+            }
+            Msg::ClipboardWritten(result, cut) => {
+                self.busy = false;
+                match result {
+                    Ok(()) => {
+                        if let Some(doc) = cut {
+                            self.commit(doc);
+                            self.pixel_selection = None;
+                        } else {
+                            self.status = self.tr("Afbeelding gekopieerd", "Image copied").into();
+                        }
                     }
+                    Err(e) => self.status = e,
                 }
             }
             Msg::Launch(path) => {
@@ -703,24 +884,76 @@ impl App {
         }
         self.menu = None;
         match c {
-            Command::Open | Command::OpenIfcx => {
+            Command::Open | Command::OpenIfcx | Command::OpenProject => {
                 self.busy = true;
-                return Task::perform(platform::open(matches!(c, Command::OpenIfcx)), Msg::Opened);
+                return Task::perform(
+                    platform::open(match c {
+                        Command::OpenIfcx => 1,
+                        Command::OpenProject => 2,
+                        _ => 0,
+                    }),
+                    Msg::Opened,
+                );
             }
             Command::Save | Command::Export(_) => {
                 let ext = if let Command::Export(ext) = c {
                     ext
                 } else {
-                    "ifcx"
+                    "paint.json"
                 };
                 self.closing_after_save = self.dialog == Some(Dialog::Close);
                 self.busy = true;
+                let snapshot = matches!(c, Command::Save).then(|| self.editor.document.clone());
                 return Task::perform(
                     platform::save(self.editor.document.clone(), ext),
-                    move |r| Msg::Saved(r, matches!(c, Command::Save)),
+                    move |r| Msg::Saved(r, snapshot.clone()),
                 );
             }
+            Command::Objects => {
+                self.dialog = Some(Dialog::Objects);
+            }
+            Command::Align(alignment) => {
+                let result = self.editor.align(alignment);
+                self.changed(result);
+            }
+            Command::Paste => {
+                self.busy = true;
+                return Task::perform(clipboard::read(), Msg::ClipboardRead);
+            }
+            Command::Copy | Command::Cut => {
+                let rect = if self.tool == Tool::Pixels {
+                    self.pixel_selection
+                } else {
+                    None
+                };
+                if matches!(c, Command::Cut) && rect.is_none() {
+                    self.status = "Selecteer eerst een pixelgebied om te knippen".into();
+                    return Task::none();
+                }
+                let bytes = if let Some(rect) = rect {
+                    paint_core::selection::copy(&self.editor.document, rect)
+                        .and_then(|p| Ok(p.encode_png()?))
+                } else {
+                    paint_core::png(&self.editor.document)
+                };
+                let cut = if matches!(c, Command::Cut) {
+                    rect.map(|r| paint_core::selection::edit(&self.editor.document, r, None))
+                        .transpose()
+                } else {
+                    Ok(None)
+                };
+                match (bytes, cut) {
+                    (Ok(bytes), Ok(cut)) => {
+                        self.busy = true;
+                        return Task::perform(clipboard::write(bytes), move |r| {
+                            Msg::ClipboardWritten(r, cut.clone())
+                        });
+                    }
+                    (Err(e), _) | (_, Err(e)) => self.status = e.to_string(),
+                }
+            }
             Command::Undo => {
+                self.pixel_selection = None;
                 self.editor.undo();
                 self.preview = None;
                 self.gesture = None;
@@ -728,11 +961,20 @@ impl App {
                 self.repaint();
             }
             Command::Redo => {
+                self.pixel_selection = None;
                 self.editor.redo();
                 self.preview = None;
                 self.gesture = None;
                 self.persist();
                 self.repaint();
+            }
+            Command::SelectAll if self.tool == Tool::Pixels => {
+                self.pixel_selection = Some(paint_core::selection::PixelRect {
+                    x: 0,
+                    y: 0,
+                    width: self.editor.document.width,
+                    height: self.editor.document.height,
+                });
             }
             Command::SelectAll => {
                 self.tool = Tool::Select;
@@ -741,6 +983,17 @@ impl App {
                 self.gesture = None;
                 self.editor.select_all();
                 self.repaint();
+            }
+            Command::Delete if self.tool == Tool::Pixels => {
+                if let Some(rect) = self.pixel_selection {
+                    match paint_core::selection::edit(&self.editor.document, rect, None) {
+                        Ok(doc) => {
+                            self.commit(doc);
+                            self.pixel_selection = None;
+                        }
+                        Err(e) => self.status = e.to_string(),
+                    }
+                }
             }
             Command::Delete => {
                 let result = self.editor.delete_selection();
@@ -840,11 +1093,11 @@ impl App {
             return Task::none();
         }
         if key == Key::Named(Named::Tab) {
-            return if m.shift() {
-                iced::widget::operation::focus_previous()
+            return openaec_ui::keyboard::navigate(if m.shift() {
+                openaec_ui::keyboard::Navigation::Previous
             } else {
-                iced::widget::operation::focus_next()
-            };
+                openaec_ui::keyboard::Navigation::Next
+            });
         }
         if self.dialog.is_some() {
             return Task::none();
@@ -859,6 +1112,10 @@ impl App {
             match key.as_ref() {
                 Key::Character("a" | "A") => Some(Command::SelectAll),
                 Key::Character("s" | "S") => Some(Command::Save),
+                Key::Character("o" | "O") if m.shift() => Some(Command::OpenProject),
+                Key::Character("c" | "C") => Some(Command::Copy),
+                Key::Character("v" | "V") => Some(Command::Paste),
+                Key::Character("x" | "X") => Some(Command::Cut),
                 Key::Character("o" | "O") => Some(Command::Open),
                 Key::Character("z" | "Z") => Some(if m.shift() {
                     Command::Redo
@@ -871,6 +1128,7 @@ impl App {
         } else {
             match key.as_ref() {
                 Key::Named(Named::Delete) => Some(Command::Delete),
+                Key::Named(Named::F6) => Some(Command::Objects),
                 Key::Named(Named::F11) => Some(Command::Focus),
                 Key::Character("b" | "B") => return self.update(Msg::Tool(Tool::Brush)),
                 Key::Character("e" | "E") => return self.update(Msg::Tool(Tool::Eraser)),
@@ -881,6 +1139,7 @@ impl App {
                 Key::Character("o" | "O") => return self.update(Msg::Tool(Tool::Ellipse)),
                 Key::Character("t" | "T") => return self.update(Msg::Tool(Tool::Text)),
                 Key::Character("v" | "V") => return self.update(Msg::Tool(Tool::Select)),
+                Key::Character("p" | "P") => return self.update(Msg::Tool(Tool::Pixels)),
                 Key::Character("c" | "C") => return self.update(Msg::Tool(Tool::Crop)),
                 Key::Character("[") => {
                     return self.update(Msg::Size((self.style.size - 1.).max(1.).to_string()))
@@ -927,7 +1186,39 @@ impl App {
                 if p.x < 0. || p.y < 0. || p.x >= doc.width as f32 || p.y >= doc.height as f32 {
                     return;
                 }
+                if self.tool == Tool::Pixels {
+                    self.gesture = if let Some(rect) =
+                        self.pixel_selection.filter(|r| r.bounds().contains(p))
+                    {
+                        Some(Gesture::PixelMove {
+                            cache: match paint_core::selection::PixelPreview::new(
+                                &self.editor.document,
+                                rect,
+                            ) {
+                                Ok(cache) => cache,
+                                Err(e) => {
+                                    self.status = e.to_string();
+                                    return;
+                                }
+                            },
+                            original: self.editor.document.clone(),
+                            rect,
+                            at: p,
+                            to: p,
+                        })
+                    } else {
+                        self.pixel_selection = None;
+                        Some(Gesture::PixelBox { from: p, to: p })
+                    };
+                    return;
+                }
                 if self.tool == Tool::Select {
+                    if self.modifiers.shift() {
+                        if let Some(i) = self.editor.hit(p) {
+                            let _ = self.update_inner(Msg::SelectObject(i));
+                        }
+                        return;
+                    }
                     let bounds = self.editor.selected_bounds();
                     let resize = bounds.is_some_and(|b| {
                         ((p.x - b.x - b.width).powi(2) + (p.y - b.y - b.height).powi(2)).sqrt()
@@ -1016,6 +1307,27 @@ impl App {
                     return;
                 };
                 match gesture {
+                    Gesture::PixelBox { to, .. } => {
+                        *to = p;
+                    }
+                    Gesture::PixelMove {
+                        cache,
+                        rect,
+                        at,
+                        to,
+                        ..
+                    } => {
+                        *to = p;
+                        let x = rect.x as i32 + (p.x - at.x).round() as i32;
+                        let y = rect.y as i32 + (p.y - at.y).round() as i32;
+                        if let Ok(pixels) = cache.paint((x, y)) {
+                            self.image = image::Handle::from_rgba(
+                                pixels.width(),
+                                pixels.height(),
+                                paint_core::render::rgba(&pixels),
+                            );
+                        }
+                    }
                     Gesture::Pan { at: from, original } => self.pan = *original + (at - *from),
                     Gesture::Draw(op) => {
                         if matches!(op.kind, Kind::Brush | Kind::Eraser) {
@@ -1084,6 +1396,37 @@ impl App {
                 let crop = self.crop_bounds();
                 let gesture = self.gesture.take();
                 match gesture {
+                    Some(Gesture::PixelBox { from, to }) => {
+                        self.pixel_selection = paint_core::selection::PixelRect::between(
+                            &self.editor.document,
+                            from,
+                            to,
+                        );
+                    }
+                    Some(Gesture::PixelMove {
+                        original,
+                        rect,
+                        at,
+                        to,
+                        ..
+                    }) => {
+                        let dx = (to.x - at.x).round() as i32;
+                        let dy = (to.y - at.y).round() as i32;
+                        if dx != 0 || dy != 0 {
+                            match paint_core::selection::edit(
+                                &original,
+                                rect,
+                                Some((rect.x as i32 + dx, rect.y as i32 + dy)),
+                            ) {
+                                Ok(doc) => {
+                                    self.preview = None;
+                                    self.commit(doc);
+                                    self.pixel_selection = None;
+                                }
+                                Err(e) => self.status = e.to_string(),
+                            }
+                        }
+                    }
                     Some(Gesture::Draw(op)) => {
                         if self.tool == Tool::Crop {
                             if let Some(b) = crop {

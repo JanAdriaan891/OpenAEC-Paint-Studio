@@ -27,3 +27,11 @@ A source archive and successful compilation cannot verify every operating-system
 The API v1 document schema and six MCP tool names remain compatible with 2026.43.1. IFCX/IFCXB save a PNG raster, not editable scene operations. Browser IndexedDB retains the previous draft schema. Native Rust drafts use their own platform data location; old Tauri application data is retained by upgrades.
 
 Imports have bounded size/dimensions and depend on the decoder's supported profiles/camera models. First frame/page only; PSD layers are flattened; no dedicated color-management or RAW adjustment workflow. See IMAGE-FORMATS.md and IFCX.md.
+
+## 2026.45.0 workflow changes — 2 November 2026
+
+The core document and API schema stay at v1. Save now writes a portable editable `*.paint.json` envelope; IFCX/IFCXB remain raster exchange. The new tests cover project roundtrips and invalid versions; original/result import dimensions; cancellation and dirty-state integrity; atomic native file replacement; browser download cancellation; screenshot paste, expansion and undo; transparent PNG clipboard; actual browser text copy/paste through a Rust clipboard adapter; rectangular pixel editing and cached previews; transformed subset alignment in six directions; and late/recovered draft handling.
+
+The workspace suite has 41 tests: 14 UI/state, 2 ribbon, 15 original core, 5 new core workflows, 4 services and 1 signing. Browser checks exercise the actual Rust/Wasm editor in isolated profiles. The new workflow suite also checks keyboard access to pixel mode, moves pixels, restores vectors with Undo, reopens a downloaded project and checks draft recovery at 560 px. Browser offline cold start and warm reload both fail without a server; no PWA offline support is claimed.
+
+The release-mode benchmark executes five isolated samples per input size and publishes its [raw measurements and report](benchmarks/2026-11-02.md). It measures our core, not human usability or competitor speed. Physical Windows/macOS and cross-application native clipboard acceptance remain separate from CI compilation/packaging.

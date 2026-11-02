@@ -1,5 +1,5 @@
 """Exercise the built native API on the host OS; optionally open the desktop window."""
-import json, os, socket, subprocess, sys, tempfile, time, urllib.request
+import json, os, socket, subprocess, sys, tempfile, time, tomllib, urllib.request
 from pathlib import Path
 binaries=Path(sys.argv[1]).resolve()
 suffix='.exe' if sys.platform=='win32' else ''
@@ -19,7 +19,8 @@ with tempfile.TemporaryDirectory() as directory:
     if process.poll() is not None:raise RuntimeError(process.stderr.read().decode())
     time.sleep(.1)
   else:raise RuntimeError('API did not start')
-  assert health['version']=='2026.44.0',health
+  expected_version=tomllib.loads((Path(__file__).resolve().parent.parent/'Cargo.toml').read_text())['workspace']['package']['version']
+  assert health['version']==expected_version,health
   document={'format':'openaec-paint','version':1,'name':'Native smoke','width':64,'height':48,'background':'#ffffff','retainVectors':True,'operations':[]}
   created=json.loads(request('/v1/documents',document))
   request(f"/v1/documents/{created['id']}/operations",{'expectedRevision':1,'operations':[{'type':'rectangle','from':{'x':5,'y':5},'to':{'x':40,'y':35},'color':'#d97706','size':2,'filled':True,'opacity':1}]})

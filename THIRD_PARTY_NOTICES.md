@@ -21,3 +21,5 @@ Cargo.lock records exact versions. This includes iced, tiny-skia, resvg, fontdue
 `paint-release legal` collects license/notice files and exact package license identifiers into each installer/service package. The release's **source.tar.gz** contains application source, all locked Cargo dependencies and offline Cargo configuration. It is the complete corresponding source for the linked LGPL components and the application code needed to rebuild/relink them; see `docs/RELEASING.md`.
 
 Historical demonstration media in docs/demo shows the previous 2026.43.1 release. The current editor screenshots are generated from the Rust UI. Playwright is used only for development browser checks; its notices remain in its package, and it is not distributed as an application dependency.
+
+Native image clipboard integration uses [Arboard 3.7.0](https://github.com/1Password/arboard), licensed under MIT OR Apache-2.0. Its source and dependency license files are included in the complete corresponding source archive.

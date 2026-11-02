@@ -38,11 +38,32 @@ pub fn image_operation(pixmap: &Pixmap) -> Result<Operation> {
         ..Default::default()
     })
 }
+#[derive(Debug, Clone)]
+pub struct ImageImport {
+    pub document: Document,
+    pub original: Size,
+}
+impl ImageImport {
+    pub fn resized(&self) -> bool {
+        self.original != self.document.size()
+    }
+}
+struct Decoded {
+    pixels: Pixmap,
+    original: Size,
+}
 pub fn import_image(bytes: &[u8], name: &str) -> Result<Document> {
+    Ok(import_image_with_info(bytes, name)?.document)
+}
+pub fn import_image_with_info(bytes: &[u8], name: &str) -> Result<ImageImport> {
     ensure!(bytes.len() <= MAX_BYTES, "Image exceeds 64 MB");
     if name.to_ascii_lowercase().ends_with(".ifcx") || name.to_ascii_lowercase().ends_with(".ifcxb")
     {
-        return read_ifcx(bytes);
+        let document = read_ifcx(bytes)?;
+        return Ok(ImageImport {
+            original: document.size(),
+            document,
+        });
     }
     let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
     let decoded = match ext.as_str() {
@@ -111,6 +132,8 @@ pub fn import_image(bytes: &[u8], name: &str) -> Result<Document> {
             fit_image(img)?
         }
     };
+    let original = decoded.original;
+    let decoded = decoded.pixels;
     let title = name
         .rsplit(['/', '\\'])
         .next()
@@ -126,9 +149,16 @@ pub fn import_image(bytes: &[u8], name: &str) -> Result<Document> {
     doc.background = "transparent".into();
     doc.operations.push(image_operation(&decoded)?);
     doc.validate()?;
-    Ok(doc)
+    Ok(ImageImport {
+        document: doc,
+        original,
+    })
 }
-fn fit_image(img: DynamicImage) -> Result<Pixmap> {
+fn fit_image(img: DynamicImage) -> Result<Decoded> {
+    let original = Size {
+        width: img.width(),
+        height: img.height(),
+    };
     let scale = (MAX_SIDE as f64 / img.width() as f64)
         .min(MAX_SIDE as f64 / img.height() as f64)
         .min((MAX_PIXELS as f64 / (u64::from(img.width()) * u64::from(img.height())) as f64).sqrt())
@@ -142,9 +172,12 @@ fn fit_image(img: DynamicImage) -> Result<Pixmap> {
     } else {
         img
     };
-    pixmap_from_rgba(img.width(), img.height(), img.to_rgba8().as_raw())
+    Ok(Decoded {
+        pixels: pixmap_from_rgba(img.width(), img.height(), img.to_rgba8().as_raw())?,
+        original,
+    })
 }
-fn decode_svg(bytes: &[u8]) -> Result<Pixmap> {
+fn decode_svg(bytes: &[u8]) -> Result<Decoded> {
     let mut options = resvg::usvg::Options::default();
     options.image_href_resolver.resolve_string = Box::new(|_, _| None);
     options
@@ -166,7 +199,13 @@ fn decode_svg(bytes: &[u8]) -> Result<Pixmap> {
         tiny_skia::Transform::from_scale(scale, scale),
         &mut image.as_mut(),
     );
-    Ok(image)
+    Ok(Decoded {
+        pixels: image,
+        original: Size {
+            width: size.width().ceil() as u32,
+            height: size.height().ceil() as u32,
+        },
+    })
 }
 pub fn export_image(doc: &Document, extension: &str) -> Result<Vec<u8>> {
     if extension == "ifcx" || extension == "ifcxb" {
@@ -287,7 +326,7 @@ fn decode_bounded(decoder: &mut impl ImageDecoder) -> Result<()> {
     Ok(())
 }
 #[cfg(not(target_arch = "wasm32"))]
-fn decode_avif(bytes: &[u8]) -> Result<Pixmap> {
+fn decode_avif(bytes: &[u8]) -> Result<Decoded> {
     // Walk bounded container boxes and reject declared oversized planes before AV1 allocation.
     fn boxes(bytes: &[u8], depth: u8) -> Result<()> {
         ensure!(depth < 12, "AVIF nesting limit");
@@ -343,6 +382,6 @@ fn decode_avif(bytes: &[u8]) -> Result<Pixmap> {
 }
 
 #[cfg(target_arch = "wasm32")]
-fn decode_avif(_: &[u8]) -> Result<Pixmap> {
+fn decode_avif(_: &[u8]) -> Result<Decoded> {
     bail!("The Rust browser adapter decodes AVIF before importing its PNG raster")
 }

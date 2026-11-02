@@ -1,0 +1,653 @@
+{
+  "environment": {
+    "started_at_utc": "2026-11-02T09:27:40.901663+00:00",
+    "commit": "e9f865ac2f08d2dffe700e92a8ddece6d4cc8793",
+    "working_tree_dirty": false,
+    "os": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+    "machine": "x86_64",
+    "cpu": "x86_64",
+    "logical_cpus": 8,
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "source_sha256": "3eac179bb054cfbffe61ce16e49a27281dfb0bf8b5fe48466700fb9d6bf6e97c",
+    "build": "release, locked Cargo dependencies",
+    "method": "Five separate native processes per image on a shared workstation. Input generation, file read and compilation excluded from phase timings. Process RSS includes allocations across all phases. Technical timings, not human task times or competitor comparisons.",
+    "cpu_info": "AMD Ryzen 7 3700U with Radeon Vega Mobile Gfx",
+    "memory_total": "MemTotal:       14254796 kB",
+    "load_average_before_samples": [
+      10.9091796875,
+      6.0732421875,
+      4.6669921875
+    ],
+    "completed_at_utc": "2026-11-02T09:29:58.824364+00:00",
+    "source_changed_during_run": false
+  },
+  "results": [
+    {
+      "input": "1200x800.png",
+      "sha256": "77a86130f6140147a5bb7348136d8f3c091d413184d3154150c8e832329f63f2",
+      "samples": [
+        {
+          "canvas": {
+            "height": 800,
+            "width": 1200
+          },
+          "input_bytes": 1449174,
+          "original": {
+            "height": 800,
+            "width": 1200
+          },
+          "output_bytes": 1692240,
+          "peak_process_rss_kib": 63108,
+          "project_bytes": 2257383,
+          "resized": false,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 72.678228,
+            "export_png": 41.316527,
+            "open": 37.045801000000004,
+            "pixel_drag_prepare": 25.088435,
+            "pixel_drag_preview": 1.8689799999999999,
+            "pixel_move_flatten": 43.144066,
+            "project_read_and_validate_render": 28.395529999999997,
+            "project_write": 5.216445,
+            "render": 25.214046,
+            "undo_redo": 0.00071
+          },
+          "version": "2026.45.0"
+        },
+        {
+          "canvas": {
+            "height": 800,
+            "width": 1200
+          },
+          "input_bytes": 1449174,
+          "original": {
+            "height": 800,
+            "width": 1200
+          },
+          "output_bytes": 1692240,
+          "peak_process_rss_kib": 63156,
+          "project_bytes": 2257383,
+          "resized": false,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 81.55426200000001,
+            "export_png": 39.119844,
+            "open": 40.228725,
+            "pixel_drag_prepare": 25.56652,
+            "pixel_drag_preview": 1.745079,
+            "pixel_move_flatten": 43.064215000000004,
+            "project_read_and_validate_render": 29.614863000000003,
+            "project_write": 6.783550999999999,
+            "render": 23.098644,
+            "undo_redo": 0.0012300000000000002
+          },
+          "version": "2026.45.0"
+        },
+        {
+          "canvas": {
+            "height": 800,
+            "width": 1200
+          },
+          "input_bytes": 1449174,
+          "original": {
+            "height": 800,
+            "width": 1200
+          },
+          "output_bytes": 1692240,
+          "peak_process_rss_kib": 63328,
+          "project_bytes": 2257383,
+          "resized": false,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 70.404914,
+            "export_png": 38.86835,
+            "open": 41.445028,
+            "pixel_drag_prepare": 25.211177000000003,
+            "pixel_drag_preview": 1.811859,
+            "pixel_move_flatten": 42.347377,
+            "project_read_and_validate_render": 27.434801,
+            "project_write": 5.462108000000001,
+            "render": 21.407867,
+            "undo_redo": 0.00117
+          },
+          "version": "2026.45.0"
+        },
+        {
+          "canvas": {
+            "height": 800,
+            "width": 1200
+          },
+          "input_bytes": 1449174,
+          "original": {
+            "height": 800,
+            "width": 1200
+          },
+          "output_bytes": 1692240,
+          "peak_process_rss_kib": 63136,
+          "project_bytes": 2257383,
+          "resized": false,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 86.420433,
+            "export_png": 45.114567,
+            "open": 35.405954,
+            "pixel_drag_prepare": 25.870163,
+            "pixel_drag_preview": 1.7396580000000001,
+            "pixel_move_flatten": 45.766484000000005,
+            "project_read_and_validate_render": 27.568381,
+            "project_write": 4.923472,
+            "render": 25.61095,
+            "undo_redo": 0.00084
+          },
+          "version": "2026.45.0"
+        },
+        {
+          "canvas": {
+            "height": 800,
+            "width": 1200
+          },
+          "input_bytes": 1449174,
+          "original": {
+            "height": 800,
+            "width": 1200
+          },
+          "output_bytes": 1692240,
+          "peak_process_rss_kib": 62888,
+          "project_bytes": 2257383,
+          "resized": false,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 71.876469,
+            "export_png": 39.210124,
+            "open": 35.832409000000006,
+            "pixel_drag_prepare": 26.839973,
+            "pixel_drag_preview": 1.625477,
+            "pixel_move_flatten": 48.386612,
+            "project_read_and_validate_render": 27.427960000000002,
+            "project_write": 5.084084,
+            "render": 21.671009,
+            "undo_redo": 0.0006
+          },
+          "version": "2026.45.0"
+        }
+      ],
+      "errors": [],
+      "summary": {
+        "automated_annotate_crop_align_export": {
+          "median_ms": 72.678228,
+          "min_ms": 70.404914,
+          "max_ms": 86.420433,
+          "stdev_ms": 6.277832180094444
+        },
+        "export_png": {
+          "median_ms": 39.210124,
+          "min_ms": 38.86835,
+          "max_ms": 45.114567,
+          "stdev_ms": 2.3637564615789506
+        },
+        "open": {
+          "median_ms": 37.045801000000004,
+          "min_ms": 35.405954,
+          "max_ms": 41.445028,
+          "stdev_ms": 2.415495807308684
+        },
+        "pixel_drag_prepare": {
+          "median_ms": 25.56652,
+          "min_ms": 25.088435,
+          "max_ms": 26.839973,
+          "stdev_ms": 0.6257966300144477
+        },
+        "pixel_drag_preview": {
+          "median_ms": 1.745079,
+          "min_ms": 1.625477,
+          "max_ms": 1.8689799999999999,
+          "stdev_ms": 0.08158781435140906
+        },
+        "pixel_move_flatten": {
+          "median_ms": 43.144066,
+          "min_ms": 42.347377,
+          "max_ms": 48.386612,
+          "stdev_ms": 2.2465458051420533
+        },
+        "project_read_and_validate_render": {
+          "median_ms": 27.568381,
+          "min_ms": 27.427960000000002,
+          "max_ms": 29.614863000000003,
+          "stdev_ms": 0.8435888205501548
+        },
+        "project_write": {
+          "median_ms": 5.216445,
+          "min_ms": 4.923472,
+          "max_ms": 6.783550999999999,
+          "stdev_ms": 0.6685101288701611
+        },
+        "render": {
+          "median_ms": 23.098644,
+          "min_ms": 21.407867,
+          "max_ms": 25.61095,
+          "stdev_ms": 1.7451579145206768
+        },
+        "undo_redo": {
+          "median_ms": 0.00084,
+          "min_ms": 0.0006,
+          "max_ms": 0.0012300000000000002,
+          "stdev_ms": 0.0002493992782667986
+        }
+      }
+    },
+    {
+      "input": "3840x2160.png",
+      "sha256": "f4b4ae9bc092f009b49e5ad4c958dd4fa4328b6b8b242969d33326f7585e503d",
+      "samples": [
+        {
+          "canvas": {
+            "height": 2160,
+            "width": 3840
+          },
+          "input_bytes": 12513661,
+          "original": {
+            "height": 2160,
+            "width": 3840
+          },
+          "output_bytes": 14593744,
+          "peak_process_rss_kib": 418056,
+          "project_bytes": 19459393,
+          "resized": false,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 502.94301500000006,
+            "export_png": 383.971348,
+            "open": 314.690435,
+            "pixel_drag_prepare": 236.766383,
+            "pixel_drag_preview": 26.236117,
+            "pixel_move_flatten": 405.93375,
+            "project_read_and_validate_render": 239.565512,
+            "project_write": 60.906643,
+            "render": 218.228286,
+            "undo_redo": 0.00131
+          },
+          "version": "2026.45.0"
+        },
+        {
+          "canvas": {
+            "height": 2160,
+            "width": 3840
+          },
+          "input_bytes": 12513661,
+          "original": {
+            "height": 2160,
+            "width": 3840
+          },
+          "output_bytes": 14593744,
+          "peak_process_rss_kib": 417680,
+          "project_bytes": 19459393,
+          "resized": false,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 498.52647,
+            "export_png": 381.548883,
+            "open": 341.065785,
+            "pixel_drag_prepare": 220.087207,
+            "pixel_drag_preview": 24.60248,
+            "pixel_move_flatten": 428.862994,
+            "project_read_and_validate_render": 243.845808,
+            "project_write": 45.730042999999995,
+            "render": 203.86962499999998,
+            "undo_redo": 0.001031
+          },
+          "version": "2026.45.0"
+        },
+        {
+          "canvas": {
+            "height": 2160,
+            "width": 3840
+          },
+          "input_bytes": 12513661,
+          "original": {
+            "height": 2160,
+            "width": 3840
+          },
+          "output_bytes": 14593744,
+          "peak_process_rss_kib": 417884,
+          "project_bytes": 19459393,
+          "resized": false,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 677.199601,
+            "export_png": 371.775751,
+            "open": 336.612359,
+            "pixel_drag_prepare": 216.88671300000001,
+            "pixel_drag_preview": 23.191726,
+            "pixel_move_flatten": 394.70552399999997,
+            "project_read_and_validate_render": 288.344899,
+            "project_write": 78.367339,
+            "render": 217.075515,
+            "undo_redo": 0.00103
+          },
+          "version": "2026.45.0"
+        },
+        {
+          "canvas": {
+            "height": 2160,
+            "width": 3840
+          },
+          "input_bytes": 12513661,
+          "original": {
+            "height": 2160,
+            "width": 3840
+          },
+          "output_bytes": 14593744,
+          "peak_process_rss_kib": 417864,
+          "project_bytes": 19459393,
+          "resized": false,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 663.580239,
+            "export_png": 417.426305,
+            "open": 376.37566,
+            "pixel_drag_prepare": 286.128927,
+            "pixel_drag_preview": 28.085646999999998,
+            "pixel_move_flatten": 412.56698400000005,
+            "project_read_and_validate_render": 382.097852,
+            "project_write": 72.71010899999999,
+            "render": 250.10859499999998,
+            "undo_redo": 0.0011099999999999999
+          },
+          "version": "2026.45.0"
+        },
+        {
+          "canvas": {
+            "height": 2160,
+            "width": 3840
+          },
+          "input_bytes": 12513661,
+          "original": {
+            "height": 2160,
+            "width": 3840
+          },
+          "output_bytes": 14593744,
+          "peak_process_rss_kib": 418060,
+          "project_bytes": 19459393,
+          "resized": false,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 517.4477549999999,
+            "export_png": 380.976091,
+            "open": 312.9475,
+            "pixel_drag_prepare": 228.410877,
+            "pixel_drag_preview": 28.158008000000002,
+            "pixel_move_flatten": 409.724955,
+            "project_read_and_validate_render": 264.236916,
+            "project_write": 57.609259,
+            "render": 208.768279,
+            "undo_redo": 0.00088
+          },
+          "version": "2026.45.0"
+        }
+      ],
+      "errors": [],
+      "summary": {
+        "automated_annotate_crop_align_export": {
+          "median_ms": 517.4477549999999,
+          "min_ms": 498.52647,
+          "max_ms": 677.199601,
+          "stdev_ms": 80.74286605792761
+        },
+        "export_png": {
+          "median_ms": 381.548883,
+          "min_ms": 371.775751,
+          "max_ms": 417.426305,
+          "stdev_ms": 15.70105178850082
+        },
+        "open": {
+          "median_ms": 336.612359,
+          "min_ms": 312.9475,
+          "max_ms": 376.37566,
+          "stdev_ms": 22.983359207118124
+        },
+        "pixel_drag_prepare": {
+          "median_ms": 228.410877,
+          "min_ms": 216.88671300000001,
+          "max_ms": 286.128927,
+          "stdev_ms": 25.202833727984128
+        },
+        "pixel_drag_preview": {
+          "median_ms": 26.236117,
+          "min_ms": 23.191726,
+          "max_ms": 28.158008000000002,
+          "stdev_ms": 1.9435598984822262
+        },
+        "pixel_move_flatten": {
+          "median_ms": 409.724955,
+          "min_ms": 394.70552399999997,
+          "max_ms": 428.862994,
+          "stdev_ms": 11.06606658824738
+        },
+        "project_read_and_validate_render": {
+          "median_ms": 264.236916,
+          "min_ms": 239.565512,
+          "max_ms": 382.097852,
+          "stdev_ms": 52.18946291425757
+        },
+        "project_write": {
+          "median_ms": 60.906643,
+          "min_ms": 45.730042999999995,
+          "max_ms": 78.367339,
+          "stdev_ms": 11.507511068573352
+        },
+        "render": {
+          "median_ms": 217.075515,
+          "min_ms": 203.86962499999998,
+          "max_ms": 250.10859499999998,
+          "stdev_ms": 16.148060961809076
+        },
+        "undo_redo": {
+          "median_ms": 0.001031,
+          "min_ms": 0.00088,
+          "max_ms": 0.00131,
+          "stdev_ms": 0.00014028314225166184
+        }
+      }
+    },
+    {
+      "input": "6000x4000.png",
+      "sha256": "78cc41f7382cea6d18f7871ab1c6dd815c9d0cada0b5021f3c9d5193ce621df2",
+      "samples": [
+        {
+          "canvas": {
+            "height": 2364,
+            "width": 3546
+          },
+          "input_bytes": 36204792,
+          "original": {
+            "height": 4000,
+            "width": 6000
+          },
+          "output_bytes": 17469553,
+          "peak_process_rss_kib": 489552,
+          "project_bytes": 23293805,
+          "resized": true,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 728.1688379999999,
+            "export_png": 426.05413,
+            "open": 2013.55752,
+            "pixel_drag_prepare": 244.010653,
+            "pixel_drag_preview": 14.672416,
+            "pixel_move_flatten": 450.339907,
+            "project_read_and_validate_render": 273.665347,
+            "project_write": 63.002247,
+            "render": 329.798111,
+            "undo_redo": 0.0009599999999999999
+          },
+          "version": "2026.45.0"
+        },
+        {
+          "canvas": {
+            "height": 2364,
+            "width": 3546
+          },
+          "input_bytes": 36204792,
+          "original": {
+            "height": 4000,
+            "width": 6000
+          },
+          "output_bytes": 17469553,
+          "peak_process_rss_kib": 489580,
+          "project_bytes": 23293805,
+          "resized": true,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 619.3681789999999,
+            "export_png": 402.197949,
+            "open": 1682.08133,
+            "pixel_drag_prepare": 261.634461,
+            "pixel_drag_preview": 16.411874,
+            "pixel_move_flatten": 467.93819599999995,
+            "project_read_and_validate_render": 256.938441,
+            "project_write": 53.244274000000004,
+            "render": 269.398322,
+            "undo_redo": 0.0012699999999999999
+          },
+          "version": "2026.45.0"
+        },
+        {
+          "canvas": {
+            "height": 2364,
+            "width": 3546
+          },
+          "input_bytes": 36204792,
+          "original": {
+            "height": 4000,
+            "width": 6000
+          },
+          "output_bytes": 17469553,
+          "peak_process_rss_kib": 489644,
+          "project_bytes": 23293805,
+          "resized": true,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 615.999586,
+            "export_png": 429.757582,
+            "open": 1752.389932,
+            "pixel_drag_prepare": 233.022249,
+            "pixel_drag_preview": 15.215631,
+            "pixel_move_flatten": 472.286174,
+            "project_read_and_validate_render": 257.130305,
+            "project_write": 57.863723,
+            "render": 323.967982,
+            "undo_redo": 0.0009490000000000001
+          },
+          "version": "2026.45.0"
+        },
+        {
+          "canvas": {
+            "height": 2364,
+            "width": 3546
+          },
+          "input_bytes": 36204792,
+          "original": {
+            "height": 4000,
+            "width": 6000
+          },
+          "output_bytes": 17469553,
+          "peak_process_rss_kib": 489788,
+          "project_bytes": 23293805,
+          "resized": true,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 645.32821,
+            "export_png": 431.289881,
+            "open": 1740.215151,
+            "pixel_drag_prepare": 255.72124000000002,
+            "pixel_drag_preview": 15.344273000000001,
+            "pixel_move_flatten": 480.795427,
+            "project_read_and_validate_render": 296.63694499999997,
+            "project_write": 56.955023,
+            "render": 347.17408900000004,
+            "undo_redo": 0.00084
+          },
+          "version": "2026.45.0"
+        },
+        {
+          "canvas": {
+            "height": 2364,
+            "width": 3546
+          },
+          "input_bytes": 36204792,
+          "original": {
+            "height": 4000,
+            "width": 6000
+          },
+          "output_bytes": 17469553,
+          "peak_process_rss_kib": 489552,
+          "project_bytes": 23293805,
+          "resized": true,
+          "timings_ms": {
+            "automated_annotate_crop_align_export": 557.7629039999999,
+            "export_png": 412.427443,
+            "open": 1702.9783140000002,
+            "pixel_drag_prepare": 239.46980000000002,
+            "pixel_drag_preview": 15.13282,
+            "pixel_move_flatten": 465.336345,
+            "project_read_and_validate_render": 266.418685,
+            "project_write": 58.291798,
+            "render": 280.402663,
+            "undo_redo": 0.00124
+          },
+          "version": "2026.45.0"
+        }
+      ],
+      "errors": [],
+      "summary": {
+        "automated_annotate_crop_align_export": {
+          "median_ms": 619.3681789999999,
+          "min_ms": 557.7629039999999,
+          "max_ms": 728.1688379999999,
+          "stdev_ms": 55.39679382420715
+        },
+        "export_png": {
+          "median_ms": 426.05413,
+          "min_ms": 402.197949,
+          "max_ms": 431.289881,
+          "stdev_ms": 11.251528371066662
+        },
+        "open": {
+          "median_ms": 1740.215151,
+          "min_ms": 1682.08133,
+          "max_ms": 2013.55752,
+          "stdev_ms": 120.33225791347348
+        },
+        "pixel_drag_prepare": {
+          "median_ms": 244.010653,
+          "min_ms": 233.022249,
+          "max_ms": 261.634461,
+          "stdev_ms": 10.497470721087526
+        },
+        "pixel_drag_preview": {
+          "median_ms": 15.215631,
+          "min_ms": 14.672416,
+          "max_ms": 16.411874,
+          "stdev_ms": 0.5747704753695689
+        },
+        "pixel_move_flatten": {
+          "median_ms": 467.93819599999995,
+          "min_ms": 450.339907,
+          "max_ms": 480.795427,
+          "stdev_ms": 9.988881656027525
+        },
+        "project_read_and_validate_render": {
+          "median_ms": 266.418685,
+          "min_ms": 256.938441,
+          "max_ms": 296.63694499999997,
+          "stdev_ms": 14.641694335785164
+        },
+        "project_write": {
+          "median_ms": 57.863723,
+          "min_ms": 53.244274000000004,
+          "max_ms": 63.002247,
+          "stdev_ms": 3.1225766980909193
+        },
+        "render": {
+          "median_ms": 323.967982,
+          "min_ms": 269.398322,
+          "max_ms": 347.17408900000004,
+          "stdev_ms": 29.977896395522627
+        },
+        "undo_redo": {
+          "median_ms": 0.0009599999999999999,
+          "min_ms": 0.00084,
+          "max_ms": 0.0012699999999999999,
+          "stdev_ms": 0.0001713970828223164
+        }
+      }
+    }
+  ]
+}

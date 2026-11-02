@@ -28,3 +28,6 @@ pub const ROTATE: &str = svg!("<path d=\"M4 8a9 9 0 1 1-1 7M4 3v6h6\"/>");
 pub const FLIP: &str = svg!("<path d=\"M12 2v20M3 6v12l6-6zm18 0v12l-6-6z\"/>");
 pub const CLOSE: &str = svg!("<path d=\"m5 5 14 14M5 19 19 5\"/>");
 pub const CHECK: &str = svg!("<path d=\"m4 12 5 5L20 5\"/>");
+
+pub const COPY: &str =
+    svg!("<rect x=\"8\" y=\"8\" width=\"13\" height=\"13\" rx=\"2\"/><path d=\"M16 8V3H3v13h5\"/>");
