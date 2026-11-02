@@ -1,5 +1,9 @@
 //! Browser integration. All editor behaviour remains in Rust.
 use wasm_bindgen::{prelude::*, JsCast};
+thread_local! { static MODIFIERS: std::cell::Cell<(bool,bool)> = const {std::cell::Cell::new((false,false))}; }
+pub(crate) fn keyboard_modifiers() -> (bool, bool) {
+    MODIFIERS.with(|c| c.get())
+}
 pub fn focus_canvas() {
     if let Some(canvas) = web_sys::window()
         .and_then(|w| w.document())
@@ -34,6 +38,9 @@ pub fn install() {
     listener.forget();
     let keyboard =
         Closure::<dyn FnMut(web_sys::KeyboardEvent)>::new(|event: web_sys::KeyboardEvent| {
+            if event.is_trusted() {
+                MODIFIERS.with(|c| c.set((event.ctrl_key(), event.meta_key())));
+            }
             let canvas = event
                 .target()
                 .and_then(|e| e.dyn_into::<web_sys::HtmlCanvasElement>().ok())
@@ -55,6 +62,18 @@ pub fn install() {
         true,
     );
     keyboard.forget();
+    let release =
+        Closure::<dyn FnMut(web_sys::KeyboardEvent)>::new(|event: web_sys::KeyboardEvent| {
+            if event.is_trusted() {
+                MODIFIERS.with(|c| c.set((event.ctrl_key(), event.meta_key())));
+            }
+        });
+    let _ = window.add_event_listener_with_callback_and_bool(
+        "keyup",
+        release.as_ref().unchecked_ref(),
+        true,
+    );
+    release.forget();
     if let Some(doc) = window.document() {
         doc.set_title("OpenAEC Paint Studio");
     }

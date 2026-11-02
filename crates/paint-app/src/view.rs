@@ -215,7 +215,7 @@ pub fn view(app: &App) -> Element<'_, Msg> {
     if let Some(d) = app.dialog {
         layers.push(dialog(app, d));
     }
-    stack(layers).into()
+    crate::text_clipboard::wrap(stack(layers).into())
 }
 fn ribbon(app: &App) -> Element<'_, Msg> {
     let look = app.look();

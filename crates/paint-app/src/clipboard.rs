@@ -108,7 +108,7 @@ pub async fn write(png: Vec<u8>) -> Result<(), String> {
 }
 
 #[cfg(target_arch = "wasm32")]
-fn browser_clipboard() -> Result<web_sys::Clipboard, String> {
+pub(crate) fn browser_clipboard() -> Result<web_sys::Clipboard, String> {
     use wasm_bindgen::{JsCast, JsValue};
     let navigator = web_sys::window().ok_or("Browser ontbreekt")?.navigator();
     let value = js_sys::Reflect::get(navigator.as_ref(), &JsValue::from_str("clipboard"))

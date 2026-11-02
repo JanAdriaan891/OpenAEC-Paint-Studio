@@ -46,8 +46,13 @@ try{
  assert.deepEqual(copied,{width:1200,height:800,alpha:0});console.log('real browser clipboard PNG paste/copy and alpha passed');
  await page.evaluate(()=>navigator.clipboard.writeText('plain text, no image'));
  const beforeEmpty=await draft();await page.keyboard.press('Control+v');await wait();assert.deepEqual(await draft(),beforeEmpty,'unsupported clipboard cannot change document');
- await page.keyboard.press('t');await page.mouse.click(600,640);await wait();await page.keyboard.type('Old');await page.keyboard.press('Control+a');await page.keyboard.type('Replacement text');await page.keyboard.press('Control+Enter');
- await expectDraft(d=>d?.operations.some(o=>o.type==='text'&&o.text==='Replacement text'),'text field keeps normal Ctrl+A');
+ await page.keyboard.press('t');await page.mouse.click(600,640);await wait();await page.keyboard.type('Old');await page.keyboard.press('Control+a');await page.keyboard.type('Replacement text');for(const modifier of ['Control','Meta']) {await page.keyboard.press(modifier+'+a');await page.keyboard.press(modifier+'+c');await wait();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'Replacement text');await page.keyboard.type('Wrong');await page.keyboard.press(modifier+'+a');await page.keyboard.press(modifier+'+v');await wait();}await page.keyboard.press('Control+Enter');
+ await expectDraft(d=>d?.operations.some(o=>o.type==='text'&&o.text==='Replacement text'),'normal text copy/paste with Ctrl and Cmd');console.log('real text clipboard with Ctrl and Cmd passed');
+ const beforeLatePaste=await draft();
+ await page.evaluate(()=>{window.paintOriginalReadText=navigator.clipboard.readText.bind(navigator.clipboard);navigator.clipboard.readText=()=>new Promise(resolve=>setTimeout(()=>resolve('Late text'),300));});
+ await page.keyboard.press('t');await page.mouse.click(600,700);await wait();await page.keyboard.type('Uncommitted');await page.keyboard.press('Control+a');await page.keyboard.press('Control+v');await page.keyboard.press('Escape');await page.waitForTimeout(700);
+ assert.deepEqual(await draft(),beforeLatePaste,'late clipboard read cannot paste after text editor closes');
+ await page.evaluate(()=>{navigator.clipboard.readText=window.paintOriginalReadText;delete window.paintOriginalReadText;});console.log('late text paste cancellation passed');
  await page.keyboard.press('F6');await wait();await page.screenshot({path:'artifacts/browser/objects-dialog.png'});await page.keyboard.press('Escape');
  const beforePixel=await draft();await page.keyboard.press('p');await wait();
  for(let i=0;i<2;i++){await page.keyboard.press('Tab');await page.waitForTimeout(150);}await page.keyboard.press('Enter');await wait();

@@ -5,6 +5,7 @@ mod icons;
 #[cfg(target_os = "macos")]
 mod macos;
 mod platform;
+mod text_clipboard;
 mod view;
 #[cfg(target_arch = "wasm32")]
 mod web;

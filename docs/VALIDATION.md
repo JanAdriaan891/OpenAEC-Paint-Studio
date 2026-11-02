@@ -30,7 +30,7 @@ Imports have bounded size/dimensions and depend on the decoder's supported profi
 
 ## 2026.45.0 workflow changes — 2 November 2026
 
-The core document and API schema stay at v1. Save now writes a portable editable `*.paint.json` envelope; IFCX/IFCXB remain raster exchange. The new tests cover project roundtrips and invalid versions; original/result import dimensions; cancellation and dirty-state integrity; atomic native file replacement; browser download cancellation; screenshot paste, expansion and undo; transparent PNG clipboard; rectangular pixel editing and cached previews; transformed subset alignment in six directions; and late/recovered draft handling.
+The core document and API schema stay at v1. Save now writes a portable editable `*.paint.json` envelope; IFCX/IFCXB remain raster exchange. The new tests cover project roundtrips and invalid versions; original/result import dimensions; cancellation and dirty-state integrity; atomic native file replacement; browser download cancellation; screenshot paste, expansion and undo; transparent PNG clipboard; actual browser text copy/paste through a Rust clipboard adapter; rectangular pixel editing and cached previews; transformed subset alignment in six directions; and late/recovered draft handling.
 
 The workspace suite has 41 tests: 14 UI/state, 2 ribbon, 15 original core, 5 new core workflows, 4 services and 1 signing. Browser checks exercise the actual Rust/Wasm editor in isolated profiles. The new workflow suite also checks keyboard access to pixel mode, moves pixels, restores vectors with Undo, reopens a downloaded project and checks draft recovery at 560 px. Browser offline cold start and warm reload both fail without a server; no PWA offline support is claimed.
 
