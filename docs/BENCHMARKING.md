@@ -35,3 +35,14 @@ For human tasks use a fixed target result, exact product version, OS/browser/har
 The results document records installed/available products and platforms. Microsoft Paint/Paint.NET need a Windows host; macOS Finder/file association acceptance needs macOS. Pinta, JS Paint and Photopea must be measured using a fixed version or dated web build and equivalent output. A source inspection or vendor feature claim is not a benchmark. Unavailable measurements are explicitly marked and do not turn into performance claims.
 
 For the build's functional baseline use `cargo test --workspace --locked`, `tests/web-smoke.mjs`, `tests/web-workflows.mjs` and `tests/native-smoke.py`. The browser tests use isolated profiles and never clear or overwrite the user's preview draft. Clipboard permissions and OS clipboard persistence need separate platform acceptance.
+
+## Image clipboard and file acceptance matrix
+
+| Platform | File behavior to accept | Clipboard behavior to accept | Evidence / remaining acceptance |
+| --- | --- | --- | --- |
+| Windows | Native image/project filters, Cancel, atomic replacement and project reopen | Ctrl+C/V; Ctrl+X in Pixels mode; screenshot DIB/bitmap, dimensions and alpha where supported | Core/state tests and platform CI; physical native dialogs and cross-app clipboard pending |
+| macOS Intel/Apple Silicon | Native dialogs, Cmd+S / Cmd+Shift+O, Finder open and atomic replacement | Cmd+C/V/X; native NSImage exchange, alpha and empty clipboard | Architecture builds/process smoke in CI; physical Finder/dialog/clipboard acceptance pending |
+| Linux X11/Wayland | Portal/native filters, file argument/drop, cancellation and atomic replacement | Ctrl+C/V/X; PNG exchange; owner persists while app runs; Wayland data-control availability | Core/state tests; CI window startup; physical desktop/portal/clipboard acceptance pending |
+| Browser Chromium | Image-only Open, separate JSON project Open, cancellable Download handoff; draft reload | PNG Clipboard API with permission on HTTPS/localhost; text fields retain text behavior | Actual isolated-profile workflow tests passed on Chromium 156.0.8078.4/Linux; other browser engines pending |
+
+The [Arboard adapter documentation](https://docs.rs/arboard/3.7.0/arboard/struct.Clipboard.html) describes native clipboard transport, not proof that every other application preserves alpha. A browser download handoff cannot establish completion on disk; cancellation of our dialog is tested independently. Native saves return success only after the complete file has replaced its target.
