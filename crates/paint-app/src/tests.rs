@@ -395,3 +395,42 @@ fn recovered_draft_requires_portable_save_and_late_recovery_cannot_replace_an_op
     let _ = opened.update(Msg::DraftLoaded(Ok(Some(recovered))));
     assert_eq!(opened.editor.document, before);
 }
+
+#[test]
+fn rejected_image_import_keeps_objects_dirty_flag_selection_and_history() {
+    let bad_webp =
+        include_bytes!("../../paint-core/tests/fixtures/webp-exif-overflow.webp").to_vec();
+    let mut bad_bmp = include_bytes!("../../paint-core/tests/fixtures/bmp-rgb24.bmp").to_vec();
+    bad_bmp[10..14].copy_from_slice(&0u32.to_le_bytes());
+    for (name, bytes) in [("bad.webp", bad_webp), ("bad.bmp", bad_bmp)] {
+        let mut app = example();
+        let original = app.editor.document.clone();
+        app.editor
+            .add(Operation {
+                kind: Kind::Rectangle,
+                from: Some(paint_core::Point::new(5., 5.)),
+                to: Some(paint_core::Point::new(15., 15.)),
+                ..Default::default()
+            })
+            .unwrap();
+        app.editor.select_all();
+        let before = app.editor.document.clone();
+        let selected = app.editor.selection.clone();
+        let generation = app.draft_generation;
+        app.busy = true;
+        let _ = app.update(Msg::Opened(Ok(Some((name.into(), bytes)))));
+        assert_eq!(app.editor.document, before, "{name}");
+        assert_eq!(app.editor.selection, selected);
+        assert!(app.editor.dirty);
+        assert!(!app.busy);
+        assert!(app.pending_import.is_none() && app.pending_document.is_none());
+        assert_eq!(app.draft_generation, generation);
+        assert!(!app.status.is_empty());
+        app.editor.undo();
+        assert_eq!(app.editor.document, original);
+        app.editor.redo();
+        assert_eq!(app.editor.document, before);
+        let portable = paint_core::project::write(&app.editor.document).unwrap();
+        assert_eq!(paint_core::project::read(&portable).unwrap(), before);
+    }
+}

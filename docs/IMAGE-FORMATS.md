@@ -18,6 +18,13 @@ Format containers have many variants; unsupported profiles return an error. PSD 
 
 Input is bounded to 64 MB. Sources are bounded to 64 megapixels (some decoder-specific allocation limits are tighter), then scaled with Lanczos to the canvas limits: at most 4096 pixels per side and 8,388,608 pixels total. Embedded PNG decoding checks dimensions before allocating the pixel buffer.
 
+WebP metadata reads receive the configured 320 MB decoder budget; oversized EXIF,
+ICC and XMP chunks return a memory-limit error. This is not a guarantee about all
+internal allocations in every codec. BMP pixel offsets must follow the headers,
+bitmasks and declared palette. Overlapping offsets (including zero) and shortened
+palettes are rejected rather than guessed. A failed image import keeps the
+current editable document intact.
+
 Output: PNG with alpha, JPEG on white, lossless WebP, SVG with retained geometry, and IFCX/IFCXB with one embedded PNG raster. SVG embeds raster operations; flood fill/eraser scenes export a raster composite to preserve appearance. Pixel corrections flatten the document and remain undoable. Geometry transforms preserve vector objects where possible.
 
 Editable work is stored separately as `*.paint.json` using Save / Ctrl+S and Open Project / Ctrl+Shift+O. It preserves the v1 scene document; see [project storage](design/PROJECTS-AND-OBJECTS.md). Large image imports show original and resulting dimensions and require confirmation before replacing the current document.
