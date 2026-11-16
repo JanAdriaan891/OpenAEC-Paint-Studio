@@ -1,6 +1,6 @@
 [workspace]
 members = ["crates/paint-core", "crates/paint-services", "crates/paint-app", "crates/paint-tools"]
-exclude = ["vendor/openaec-ui", "vendor/avif-decode", "vendor/rawler"]
+exclude = ["vendor/openaec-ui", "vendor/avif-decode", "vendor/rawler", "vendor/image"]
 resolver = "2"
 
 [workspace.package]
@@ -15,7 +15,7 @@ serde_json = "1"
 anyhow = "1"
 base64 = "0.22"
 uuid = { version = "1", features = ["v4", "serde", "js"] }
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff", "ico", "tga", "pnm", "qoi", "hdr", "exr", "dds", "ff"] }
+image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff", "ico", "tga", "pnm", "qoi", "hdr", "exr", "dds", "ff"] }
 paint-core = { path = "crates/paint-core" }
 
 [profile.release]
@@ -25,6 +25,7 @@ codegen-units = 8
 strip = true
 
 [patch.crates-io]
+image = { path = "vendor/image" }
 avif-decode = { path = "vendor/avif-decode" }
 
 rawler = { path = "vendor/rawler" }

@@ -35,3 +35,27 @@ The core document and API schema stay at v1. Save now writes a portable editable
 The workspace suite has 41 tests: 14 UI/state, 2 ribbon, 15 original core, 5 new core workflows, 4 services and 1 signing. Browser checks exercise the actual Rust/Wasm editor in isolated profiles. The new workflow suite also checks keyboard access to pixel mode, moves pixels, restores vectors with Undo, reopens a downloaded project and checks draft recovery at 560 px. Browser offline cold start and warm reload both fail without a server; no PWA offline support is claimed.
 
 The release-mode benchmark executes five isolated samples per input size and publishes its [raw measurements and report](benchmarks/2026-11-02.md). It measures our core, not human usability or competitor speed. Physical Windows/macOS and cross-application native clipboard acceptance remain separate from CI compilation/packaging.
+
+## Decoder hardening — 16 November 2026
+
+The locked `image 0.25.10` source is vendored with two small, documented patches;
+no unrelated dependency versions change. The WebP adapter forwards the memory
+limit before EXIF/ICC/XMP reads and returns `ImageError::Limits`. BMP files whose
+pixel offset overlaps headers, masks or the declared palette are rejected rather
+than silently displaying metadata as pixels. Truncated/overstated palettes are
+also rejected; embedded V4/V5 masks and headerless ICO/DIB paths stay supported.
+See [patch provenance and remaining scope](../vendor/image/PAINT-CHANGES.md).
+
+Six decoder regression tests cover the 64-byte WebP reproducer (including a wrong
+filename extension), its valid control, three metadata readers, dimension checks,
+WebP alpha/EXIF rotation, six BMP header/palette/mask variants with normal offsets
+and gaps, overlapping offsets and ICO. The native test binary exits before any
+single allocation above 320 MB, so reverting the WebP fix cannot reserve the
+reported 4 GiB on the test host. An app-state test checks failed imports preserve
+editable objects, selection, dirty state, undo/redo and subsequent project saving.
+
+The browser workflow suite opens both malformed files in an isolated profile,
+checks the editable draft is unchanged, continues the save/edit workflow and
+independently reads back the red/blue pixels of valid BMP/ICO imports. It also
+opens the valid WebP control. These automated checks do not close the remaining
+physical-platform and human-task acceptance in issue #7.

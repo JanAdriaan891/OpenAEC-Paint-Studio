@@ -9,8 +9,8 @@ const page=await context.newPage();page.on('filechooser',()=>{});
 const errors=[];page.on('pageerror',e=>errors.push(String(e)));
 const base=process.env.PAINT_WEB_URL||'http://127.0.0.1:49325/';
 const wait=()=>page.waitForTimeout(400);
-const draft=()=>page.evaluate(async()=>{const db=await new Promise((ok,no)=>{const r=indexedDB.open('openaec-paint',1);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});try{return await new Promise((ok,no)=>{const r=db.transaction('drafts').objectStore('drafts').get('current');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});}finally{db.close();}});
-async function expectDraft(predicate,label){for(let i=0;i<120;i++){const d=await draft();if(predicate(d))return d;await page.waitForTimeout(100);}throw new Error(label+': '+JSON.stringify(await draft()));}
+const draft=(target=page)=>target.evaluate(async()=>{const db=await new Promise((ok,no)=>{const r=indexedDB.open('openaec-paint',1);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});try{return await new Promise((ok,no)=>{const r=db.transaction('drafts').objectStore('drafts').get('current');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});}finally{db.close();}});
+async function expectDraft(predicate,label,target=page){for(let i=0;i<120;i++){const d=await draft(target);if(predicate(d))return d;await target.waitForTimeout(100);}throw new Error(label+': '+JSON.stringify(await draft(target)));}
 async function choose(keys,name,mimeType,buffer){await page.locator('canvas').focus();await page.keyboard.press(keys);const input=page.locator('#rfd-input');await input.waitFor({state:'attached'});const accept=await input.getAttribute('accept');await input.setInputFiles({name,mimeType,buffer});return accept;}
 // Independent PNG fixture writer, avoiding reliance on the application's codec.
 function png(w,h){let table=Array.from({length:256},(_,n)=>{let c=n;for(let k=0;k<8;k++)c=(c&1)?0xedb88320^(c>>>1):c>>>1;return c>>>0;});const chunk=(tag,data)=>{let type=Buffer.from(tag),size=Buffer.alloc(4),crc=0xffffffff;size.writeUInt32BE(data.length);for(const b of Buffer.concat([type,data]))crc=table[(crc^b)&255]^(crc>>>8);const end=Buffer.alloc(4);end.writeUInt32BE((crc^0xffffffff)>>>0);return Buffer.concat([size,type,data,end]);};let header=Buffer.alloc(13);header.writeUInt32BE(w);header.writeUInt32BE(h,4);header[8]=8;header[9]=6;let row=Buffer.alloc(w*4+1);for(let i=1;i<row.length;i+=4){row[i]=20;row[i+1]=90;row[i+2]=230;row[i+3]=128;}return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),chunk('IDAT',deflateSync(Buffer.concat(Array.from({length:h},()=>row)))),chunk('IEND',Buffer.alloc(0))]);}
@@ -25,6 +25,15 @@ try{
  const filter=await choose('Control+Shift+o','Workflow.paint.json','application/json',Buffer.from(JSON.stringify({format:'openaec-paint-project',version:1,document:source})));
  assert(filter.includes('.json')&&!filter.includes('.oapaint'));
  const baseline=await expectDraft(d=>d?.name==='Workflow'&&d.operations.length===3,'open editable project');
+ // Rejected images must leave the editable draft and browser runtime usable.
+ const badWebp=await readFile('crates/paint-core/tests/fixtures/webp-exif-overflow.webp');
+ const badBmp=Buffer.from(await readFile('crates/paint-core/tests/fixtures/bmp-rgb24.bmp'));badBmp.writeUInt32LE(0,10);
+ for(const [name,mimeType,buffer] of [['bad.webp','image/webp',badWebp],['bad.bmp','image/bmp',badBmp]]) {
+  await choose('Control+o',name,mimeType,buffer);await page.waitForTimeout(1000);
+  assert.deepEqual(await draft(),baseline,name+': rejected import must preserve editable objects');
+  assert.equal(await page.locator('canvas').count(),1,name+': editor remains mounted');
+ }
+ console.log('malformed WebP/BMP rejected without replacing the editable browser draft');
  const downloadPromise=page.waitForEvent('download');await page.keyboard.press('Control+s');await page.locator('#paint-download-link').click();const download=await downloadPromise;
  assert.equal(download.suggestedFilename(),'Workflow.paint.json');const saved=JSON.parse(await readFile(await download.path(),'utf8'));
  assert.equal(saved.format,'openaec-paint-project');assert.equal(saved.document.operations[0].text,'First\nSecond');
@@ -67,6 +76,21 @@ try{
  await page.reload({timeout:120000});await page.locator('canvas').first().waitFor();await page.waitForTimeout(1800);assert.deepEqual(await draft(),beforeLarge,'new project/draft survives reload');
  await page.setViewportSize({width:560,height:800});await wait();await page.keyboard.press('F6');await wait();await page.screenshot({path:'artifacts/browser/objects-dialog-narrow.png'});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),560);await page.keyboard.press('Escape');
  assert.deepEqual(errors,[]);
+ // Fresh profile: real BMP palette/bitmask variants and valid WebP still import.
+ const validContext=await browser.newContext({viewport:{width:1440,height:940}});
+ const validPage=await validContext.newPage();validPage.on('filechooser',()=>{});validPage.on('pageerror',e=>errors.push(String(e)));
+ await validPage.goto(base,{timeout:120000});await validPage.locator('canvas').waitFor();await validPage.waitForTimeout(1800);
+ for(const file of ['bmp-pal8.bmp','bmp-bitfields16.bmp','bmp-v4-bitfields.bmp','bmp-v5-bitfields.bmp','bmp-icon.ico','bmp-rgb24.bmp']) {
+  await validPage.locator('canvas').focus();await validPage.keyboard.press('Control+o');const input=validPage.locator('#rfd-input');await input.waitFor({state:'attached'});
+  await input.setInputFiles({name:file,mimeType:'application/octet-stream',buffer:await readFile('crates/paint-core/tests/fixtures/'+file)});
+  const imported=await expectDraft(d=>d?.name===file.replace(/\.[^.]+$/,''),'valid '+file,validPage);
+  const colors=await validPage.evaluate(async uri=>{const blob=await(await fetch(uri)).blob();const bitmap=await createImageBitmap(blob);const c=document.createElement('canvas');c.width=bitmap.width;c.height=bitmap.height;const ctx=c.getContext('2d');ctx.drawImage(bitmap,0,0);return Array.from(ctx.getImageData(0,0,2,1).data);},imported.operations[0].data);
+  assert.deepEqual(colors,[255,0,0,255,0,0,255,255],file);
+ }
+ const goodWebp=Buffer.from(badWebp);goodWebp.writeUInt32LE(4,56);
+ await validPage.keyboard.press('Control+o');await validPage.locator('#rfd-input').waitFor({state:'attached'});await validPage.locator('#rfd-input').setInputFiles({name:'control.webp',mimeType:'image/webp',buffer:goodWebp});
+ const control=await expectDraft(d=>d?.name==='control','valid WebP control',validPage);assert.equal(control.width,1);assert.equal(control.height,1);
+ assert.deepEqual(errors,[]);await validContext.close();console.log('valid BMP/ICO colors and WebP control passed in Wasm');
  const registrations=await page.evaluate(()=>navigator.serviceWorker?.getRegistrations().then(r=>r.length)??0);assert.equal(registrations,0,'no offline PWA is claimed');
  await context.setOffline(true);let warmOffline=false;try{await page.reload({timeout:5000});await page.locator('canvas').waitFor({timeout:3000});warmOffline=true;}catch{}
  const cold=await browser.newContext({offline:true});const coldPage=await cold.newPage();let coldOffline=false;try{await coldPage.goto(base,{timeout:5000});await coldPage.locator('canvas').waitFor({timeout:3000});coldOffline=true;}catch{}await cold.close();
